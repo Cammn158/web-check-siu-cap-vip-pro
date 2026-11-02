@@ -1,5 +1,47 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Toaster, toast } from 'sonner';
+import {
+  Building2,
+  FileSpreadsheet,
+  CalendarRange,
+  Search,
+  X,
+  Play,
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Sparkles,
+  Download,
+  Copy,
+  Check,
+  Send,
+  Eye,
+  FileWarning,
+  Layers,
+  ListChecks,
+  BookOpenCheck,
+  SpellCheck,
+  ShieldAlert,
+  GraduationCap,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Plus,
+  Sun,
+  Moon,
+  Palette,
+  SlidersHorizontal,
+  FolderKanban,
+  ArrowDownToLine,
+  FileText,
+  ChevronUp,
+  ChevronDown,
+  Zap,
+  Info,
+} from 'lucide-react';
 import {
   clean,
   sheetToRows,
@@ -8,214 +50,7 @@ import {
   runPrettyCrossCheck,
 } from './utils/parser.js';
 import { exportAnnotatedPrettyCopy } from './utils/exporter.js';
-
-const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg:#0f1117; --surface:#181c27; --surface2:#1e2335; --border:#2a3050;
-    --accent:#4f8ef7; --accent2:#7c5cfc; --green:#22c55e; --red:#ef4444;
-    --yellow:#f59e0b; --orange:#f97316; --teal:#14b8a6; --pink:#ec4899;
-    --gray:#6b7280; --text:#e2e8f0; --text2:#94a3b8;
-    --font:'Be Vietnam Pro',sans-serif; --mono:'JetBrains Mono',monospace;
-  }
-  body{background:var(--bg);color:var(--text);font-family:var(--font);}
-  .app{min-height:100vh;padding:28px 22px 64px;max-width:1320px;margin:0 auto;}
-
-  .header{margin-bottom:24px;}
-  .header-tag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:3px 10px;border-radius:4px;margin-bottom:10px;font-family:var(--mono);}
-  .header h1{font-size:25px;font-weight:700;background:linear-gradient(135deg,#e2e8f0 30%,#4f8ef7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-  .header p{color:var(--text2);margin-top:6px;font-size:13px;line-height:1.6;}
-
-  /* 3 UPLOAD CARDS */
-  .upload-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:16px;}
-  @media(max-width:900px){.upload-grid-3{grid-template-columns:1fr;}}
-  .upload-card{background:var(--surface);border:1.5px dashed var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;position:relative;}
-  .upload-card:hover,.upload-card.drag-over{border-color:var(--accent);background:rgba(79,142,247,.05);}
-  .upload-card.has-file.card-mybk{border-style:solid;border-color:var(--orange);background:rgba(249,115,22,.06);}
-  .upload-card.has-file.card-ctdt{border-style:solid;border-color:var(--accent);background:rgba(79,142,247,.07);}
-  .upload-card.has-file.card-khgd{border-style:solid;border-color:var(--teal);background:rgba(20,184,166,.07);}
-  .upload-card input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:1;}
-  .clear-file-btn{position:absolute;top:10px;right:10px;z-index:3;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:2px 7px;font-size:10.5px;cursor:pointer;}
-  .clear-file-btn:hover{border-color:var(--red);color:var(--red);}
-  .upload-icon{font-size:20px;margin-bottom:6px;}
-  .upload-label{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;font-family:var(--mono);margin-bottom:3px;}
-  .upload-title{font-size:13px;font-weight:600;margin-bottom:3px;word-break:break-word;}
-  .upload-desc{font-size:11px;color:var(--text2);line-height:1.45;}
-  .upload-filename{margin-top:8px;font-size:11px;font-family:var(--mono);padding:3px 8px;border-radius:5px;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-
-  .run-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;transition:all .2s;margin-bottom:22px;}
-  .run-btn:hover{opacity:.9;transform:translateY(-1px);}
-  .run-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
-
-  /* BẢNG PHÂN TÁCH LỖI THEO 3 FILE (BIẾT NGAY SAI Ở FILE NÀO) */
-  .file-split-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
-  @media(max-width:920px){.file-split-grid{grid-template-columns:1fr;}}
-  .file-health-card{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;transition:all .18s;}
-  .file-health-card.active-scope{box-shadow:0 0 0 2px var(--accent),0 6px 20px rgba(79,142,247,.14);}
-  .fh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
-  .fh-tag{font-size:10px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;padding:2px 7px;border-radius:4px;}
-  .fh-title{font-size:13.5px;font-weight:700;margin-bottom:4px;}
-  .fh-breakdown{font-size:11.5px;color:var(--text2);line-height:1.55;margin-bottom:12px;}
-  .fh-actions{display:flex;gap:7px;flex-wrap:wrap;}
-  .fh-btn{padding:6px 11px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s;}
-  .fh-btn:hover{border-color:var(--accent);color:var(--accent);}
-  .fh-btn.btn-red{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35);color:#fca5a5;}
-  .fh-btn.btn-red:hover{background:rgba(239,68,68,.22);color:#fff;}
-  .fh-btn.btn-orange{background:rgba(249,115,22,.13);border-color:rgba(249,115,22,.38);color:#fdba74;}
-  .fh-btn.btn-orange:hover{background:rgba(249,115,22,.24);color:#fff;}
-
-  /* THANH CHỌN FILE ĐẸP ĐANG XEM TRONG B1-B3 */
-  .scope-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:16px;}
-  .scope-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-  .scope-btn{padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s;}
-  .scope-btn:hover{color:var(--text);}
-  .scope-btn.active-ctdt{border-color:var(--accent);background:rgba(79,142,247,.15);color:#93c5fd;}
-  .scope-btn.active-khgd{border-color:var(--teal);background:rgba(20,184,166,.15);color:#5eead4;}
-
-  /* STEPPER PIPELINE BAR */
-  .stepper-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;flex-wrap:wrap;gap:8px;}
-  .stepper-hint{font-size:11.5px;color:var(--text2);}
-  .reset-order-btn{background:none;border:1px solid var(--border);color:var(--text2);font-size:11px;padding:3px 9px;border-radius:6px;cursor:pointer;font-family:var(--font);}
-  .reset-order-btn:hover{border-color:var(--accent);color:var(--accent);}
-
-  .stepper-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
-  @media(max-width:920px){.stepper-grid{grid-template-columns:repeat(2,1fr);}}
-  @media(max-width:520px){.stepper-grid{grid-template-columns:1fr;}}
-  .step-card{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:13px 14px;cursor:pointer;transition:all .18s;display:flex;flex-direction:column;justify-content:space-between;}
-  .step-card:hover{border-color:rgba(79,142,247,.55);transform:translateY(-1px);}
-  .step-card.active{border-color:var(--accent);background:linear-gradient(180deg,rgba(79,142,247,.13),rgba(124,92,252,.06));}
-  .step-card.priority-step.active{border-color:var(--pink);background:linear-gradient(180deg,rgba(236,72,153,.14),rgba(124,92,252,.06));}
-  .step-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;gap:6px;}
-  .step-num-tag{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--surface2);color:var(--accent);border:1px solid var(--border);}
-  .step-card.priority-step .step-num-tag{color:#f472b6;border-color:rgba(236,72,153,.35);}
-  .step-reorder{display:flex;gap:3px;}
-  .reorder-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:10px;width:20px;height:20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;}
-  .reorder-btn:hover:not(:disabled){border-color:var(--accent);color:var(--text);}
-  .reorder-btn:disabled{opacity:.25;cursor:default;}
-  .step-title{font-size:13px;font-weight:700;line-height:1.35;margin-bottom:4px;color:var(--text);}
-  .step-desc{font-size:11px;color:var(--text2);line-height:1.45;margin-bottom:9px;}
-  .step-footer{display:flex;justify-content:space-between;align-items:center;}
-
-  .subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);}
-  .subtab-btn{padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;font-weight:500;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
-  .subtab-btn:hover{border-color:var(--accent);color:var(--text);}
-  .subtab-btn.active{background:rgba(79,142,247,.14);border-color:var(--accent);color:var(--accent);font-weight:600;}
-
-  .tb{font-size:10px;font-weight:700;padding:1.5px 7px;border-radius:20px;font-family:var(--mono);}
-  .tb-red{background:var(--red);color:white;}
-  .tb-ok{background:rgba(34,197,94,.18);color:#4ade80;border:1px solid rgba(34,197,94,.3);}
-  .tb-warn{background:var(--yellow);color:#111;}
-  .tb-pink{background:var(--pink);color:white;}
-  .tb-blue{background:rgba(79,142,247,.2);color:#93c5fd;}
-  .tb-orange{background:rgba(249,115,22,.22);color:#fdba74;border:1px solid rgba(249,115,22,.35);}
-
-  .file-origin-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap;font-family:var(--mono);}
-  .fo-ctdt{background:rgba(79,142,247,.15);color:#93c5fd;border:1px solid rgba(79,142,247,.35);}
-  .fo-khgd{background:rgba(20,184,166,.15);color:#5eead4;border:1px solid rgba(20,184,166,.35);}
-  .fo-mybk{background:rgba(249,115,22,.16);color:#fdba74;border:1px solid rgba(249,115,22,.38);}
-  .fo-err{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.38);}
-
-  .filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
-  .filter-tab{padding:4px 11px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;font-family:var(--font);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;}
-  .filter-tab:hover{border-color:var(--accent);color:var(--accent);}
-  .filter-tab.active{background:var(--accent);border-color:var(--accent);color:white;font-weight:600;}
-  .fdot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0;}
-
-  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;}
-  .table-scroll{overflow-x:auto;max-height:560px;overflow-y:auto;}
-  table{width:100%;border-collapse:collapse;font-size:12.5px;}
-  thead{background:var(--surface2);position:sticky;top:0;z-index:2;}
-  th{padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;}
-  td{padding:8px 12px;border-bottom:1px solid rgba(42,48,80,.4);vertical-align:middle;}
-  tr:last-child td{border-bottom:none;}
-  tr:hover td{background:rgba(255,255,255,.018);}
-  .row-vi{font-weight:500;color:var(--text);}
-  .row-en{font-size:11px;color:var(--text2);font-style:italic;}
-  .row-group td{background:rgba(79,142,247,.055);}
-  .code-cell{font-family:var(--mono);font-size:11px;color:var(--accent);white-space:nowrap;font-weight:600;}
-  .cred-cell{text-align:center;font-family:var(--mono);font-weight:600;}
-
-  .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;white-space:nowrap;}
-  .b-match{background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.22);}
-  .b-miss{background:rgba(239,68,68,.09);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
-  .b-wrong{background:rgba(245,158,11,.09);color:#f59e0b;border:1px solid rgba(245,158,11,.2);}
-  .b-wrong-en{background:rgba(79,142,247,.09);color:#4f8ef7;border:1px solid rgba(79,142,247,.2);}
-  .b-wrong-prereq{background:rgba(236,72,153,.12);color:#f472b6;border:1px solid rgba(236,72,153,.3);}
-  .b-na{background:rgba(239,68,68,.07);color:#f87171;border:1px solid rgba(239,68,68,.15);}
-  .b-skip{background:rgba(107,114,128,.09);color:#9ca3af;border:1px solid rgba(107,114,128,.22);}
-  .b-bb{background:rgba(124,92,252,.14);color:#c4b5fd;border:1px solid rgba(124,92,252,.3);font-family:var(--mono);}
-  .b-tc{background:rgba(20,184,166,.12);color:#5eead4;border:1px solid rgba(20,184,166,.28);font-family:var(--mono);}
-
-  .prereq-list{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
-  .prereq-pill{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:10.5px;padding:1.5px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);white-space:nowrap;}
-  .prereq-pill.t-TQ{background:rgba(236,72,153,.13);color:#f472b6;border-color:rgba(236,72,153,.35);font-weight:600;}
-  .prereq-pill.t-HT{background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.3);}
-  .prereq-pill.t-SH,.prereq-pill.t-SHT{background:rgba(20,184,166,.12);color:#2dd4bf;border-color:rgba(20,184,166,.3);}
-  .prereq-pill.t-KN{background:rgba(79,142,247,.1);color:#93c5fd;border:color:rgba(79,142,247,.25);}
-
-  .grp-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px;}
-  .grp-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
-  .grp-header-title{font-size:13px;font-weight:600;}
-  .grp-header-sub{font-size:11px;color:var(--text2);}
-  .grp-grid{display:grid;grid-template-columns:2.4fr 0.8fr 0.9fr 0.9fr 1fr 140px;gap:0;}
-  @media(max-width:760px){.grp-grid{grid-template-columns:1.8fr 0.7fr 0.8fr 0.8fr 0.8fr 110px;}}
-  .grp-grid>div{padding:9px 12px;font-size:12px;display:flex;align-items:center;}
-  .grp-grid.grp-th>div{font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--text2);background:var(--surface2);border-bottom:1px solid var(--border);}
-  .grp-row-data{border-bottom:1px solid rgba(42,48,80,.4);}
-  .grp-row-data:last-child{border-bottom:none;}
-  .grp-id-badge{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;margin-right:8px;}
-  .num-ok{color:var(--green);font-weight:700;font-family:var(--mono);}
-  .num-bad{color:var(--red);font-weight:700;font-family:var(--mono);}
-  .num-neutral{color:var(--text);font-family:var(--mono);}
-
-  .section-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;}
-  .section-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surface2);flex-wrap:wrap;}
-  .section-head-left{display:flex;align-items:center;gap:8px;}
-  .section-head-title{font-size:13px;font-weight:600;}
-  .section-head-count{font-size:11px;color:var(--text2);}
-  .section-body{padding:14px 16px;}
-
-  .alert-banner{border-radius:10px;padding:12px 15px;margin-bottom:14px;font-size:12.5px;line-height:1.6;display:flex;gap:10px;align-items:flex-start;}
-  .alert-warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.28);color:#fcd34d;}
-  .alert-ok{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);color:#86efac;}
-  .alert-pink{background:rgba(236,72,153,.09);border:1px solid rgba(236,72,153,.3);color:#fbcfe8;}
-
-  .toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
-  .export-btn{padding:5px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-size:11px;font-family:var(--font);cursor:pointer;transition:all .15s;white-space:nowrap;}
-  .export-btn:hover{border-color:var(--accent);color:var(--accent);}
-  .red-action-btn{padding:11px 20px;background:linear-gradient(135deg,#ef4444,#dc2626);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;transition:all .18s;display:inline-flex;align-items:center;gap:7px;}
-  .red-action-btn:hover{opacity:.92;transform:translateY(-1px);}
-  .red-action-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
-
-  .note-input{width:100%;min-width:165px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:11.5px;font-family:var(--font);}
-  .note-input:focus{outline:none;border-color:var(--red);}
-  .note-input.has-val{border-color:rgba(239,68,68,.55);color:#fca5a5;background:rgba(239,68,68,.06);}
-  .b4-config-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin-bottom:16px;}
-  @media(max-width:820px){.b4-config-grid{grid-template-columns:1fr;}}
-
-  /* KHUNG NOTE FILE MYBK ĐỂ BÁO RIÊNG VỚI CÔ */
-  .professor-panel{background:linear-gradient(180deg,rgba(249,115,22,.07),rgba(24,28,39,.98));border:1.5px solid rgba(249,115,22,.38);border-radius:14px;overflow:hidden;margin-top:26px;}
-  .prof-head{padding:14px 18px;background:rgba(249,115,22,.12);border-bottom:1px solid rgba(249,115,22,.28);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
-  .prof-body{padding:16px 18px;display:grid;grid-template-columns:1.1fr 1fr;gap:18px;}
-  @media(max-width:860px){.prof-body{grid-template-columns:1fr;}}
-  .prof-item{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:8px;background:rgba(15,17,23,.55);border:1px solid var(--border);margin-bottom:7px;font-size:12px;line-height:1.5;}
-  .prof-textarea{width:100%;min-height:220px;background:#0b0d13;border:1px solid rgba(249,115,22,.4);border-radius:9px;padding:12px;color:#fde68a;font-size:12.5px;line-height:1.65;font-family:var(--font);resize:vertical;}
-  .prof-textarea:focus{outline:none;border-color:var(--orange);}
-
-  .option-btn{padding:6px 13px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;font-family:var(--font);cursor:pointer;transition:all .15s;}
-  .option-btn:hover{border-color:var(--accent);color:var(--accent);}
-  .option-btn.active{border-color:var(--accent);background:rgba(79,142,247,.12);color:var(--accent);font-weight:600;}
-
-  .step-nav-footer{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:14px;border-top:1px solid var(--border);}
-  .error-box{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.22);border-radius:10px;padding:12px 14px;color:#f87171;font-size:12.5px;margin-bottom:18px;line-height:1.6;white-space:pre-line;}
-  .empty-state{text-align:center;padding:38px 20px;color:var(--text2);}
-  .empty-state .icon{font-size:36px;margin-bottom:10px;}
-  .empty-state p{font-size:13px;line-height:1.7;}
-  .diff-hint{font-size:10.5px;color:var(--orange);margin-top:3px;}
-  .diff-hint-blue{font-size:10.5px;color:var(--accent);margin-top:3px;}
-  .diff-hint-pink{font-size:10.5px;color:var(--pink);margin-top:3px;}
-`;
+import './styles/theme.css';
 
 const DEFAULT_STEP_ORDER = ['b1', 'b2', 'b3', 'b4'];
 
@@ -225,12 +60,14 @@ const STEP_META = {
     code: 'B1',
     title: 'Phân nhóm & Bắt buộc / Tự chọn',
     desc: 'Kiểm tra môn BB / TC thuộc đúng nhóm & học kỳ trên từng file',
+    icon: Layers,
   },
   b2: {
     id: 'b2',
     code: 'B2',
     title: 'Sót môn, Tín chỉ, Nội dung & Chính tả',
     desc: 'Tách rõ sót/sai ở CTĐT đẹp, KHGD đẹp hay lỗi gốc từ MyBK',
+    icon: ListChecks,
   },
   b3: {
     id: 'b3',
@@ -238,38 +75,40 @@ const STEP_META = {
     title: 'Tiên quyết (Quan trọng), Bắt buộc & ĐK Tốt nghiệp',
     desc: 'Rà tiên quyết, môn BB, ghi chú & Đ/kiện ngoại ngữ tốt nghiệp SĐH',
     priority: true,
+    icon: ShieldAlert,
   },
   b4: {
     id: 'b4',
     code: 'B4',
     title: 'Xuất Bản Sao Tô Đỏ (CTĐT / KHGD)',
     desc: 'Tạo bản sao File đẹp với chữ đỏ / highlight ô đỏ để tự check & sửa',
+    icon: FileWarning,
   },
 };
 
 const GROUP_COLORS_CTDT = {
-  A: '#4f8ef7',
-  'A.1': '#4f8ef7',
-  'A.2': '#7c5cfc',
-  'A.3': '#14b8a6',
-  B: '#22c55e',
-  C: '#f59e0b',
-  'C.1': '#f59e0b',
-  'C.2': '#f97316',
-  D: '#ec4899',
-  E: '#6b7280',
+  A: '#2563eb',
+  'A.1': '#2563eb',
+  'A.2': '#7c3aed',
+  'A.3': '#0d9488',
+  B: '#059669',
+  C: '#d97706',
+  'C.1': '#d97706',
+  'C.2': '#ea580c',
+  D: '#db2777',
+  E: '#64748b',
 };
 
 const GROUP_COLORS_KHGD = {
-  HK1: '#22c55e',
-  HK2: '#4f8ef7',
-  HK3: '#f59e0b',
-  HK4: '#f97316',
-  HK5: '#ec4899',
+  HK1: '#059669',
+  HK2: '#2563eb',
+  HK3: '#d97706',
+  HK4: '#ea580c',
+  HK5: '#db2777',
 };
 
 function getGroupColor(gid, mode) {
-  return (mode === 'khgd' ? GROUP_COLORS_KHGD : GROUP_COLORS_CTDT)[gid] || '#94a3b8';
+  return (mode === 'khgd' ? GROUP_COLORS_KHGD : GROUP_COLORS_CTDT)[gid] || '#64748b';
 }
 
 const STATUS_BADGES = {
@@ -322,6 +161,18 @@ function PrereqPills({ items, emptyText = '—' }) {
 }
 
 export default function App() {
+  // Giao diện Theme mới (Mặc định: 'light' Studio để lột xác hoàn toàn so với theme tối cũ, hỗ trợ đổi sang 'emerald' và 'dark')
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('web_check_theme') || 'light';
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [collapseUploads, setCollapseUploads] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('web_check_theme', theme);
+  }, [theme]);
+
   // 3 FILE ĐẦU VÀO: 1 File gốc MyBK + 2 File Bản đẹp (CTĐT & KHGD)
   const [fileMybk, setFileMybk] = useState(null);
   const [fileCtdtPretty, setFileCtdtPretty] = useState(null);
@@ -396,18 +247,21 @@ export default function App() {
     const base = f.name.replace(/\.(xlsx|xls|csv)$/i, '');
     if (slot === 'mybk') {
       setFileMybk(f);
+      toast.success(`Đã nạp File 1 (Gốc MyBK): ${f.name}`);
     } else if (slot === 'ctdt') {
       setFileCtdtPretty(f);
       setOutNameByFile((prev) => ({
         ...prev,
         ctdt: `${base}_check_note_do.xlsx`,
       }));
+      toast.success(`Đã nạp File 2 (Bản đẹp CTĐT): ${f.name}`);
     } else if (slot === 'khgd') {
       setFileKhgdPretty(f);
       setOutNameByFile((prev) => ({
         ...prev,
         khgd: `${base}_check_note_do.xlsx`,
       }));
+      toast.success(`Đã nạp File 3 (Bản đẹp KHGD): ${f.name}`);
     }
   };
 
@@ -551,8 +405,13 @@ export default function App() {
       setRowFilter('all');
       const targetRes = defaultScope === 'ctdt' ? ctdtResult : khgdResult;
       setPrereqFilter(targetRes?.prereqMismatches.length > 0 ? 'mismatch' : 'all');
+
+      toast.success('Hoàn tất phân tích & đối chiếu dữ liệu!', {
+        description: `Đã tách riêng lỗi Bản đẹp và ${mybkAudit.totalIssues} mục cần báo Cô trên MyBK.`,
+      });
     } catch (err) {
       setError(err.message);
+      toast.error(`Lỗi phân tích: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -589,6 +448,7 @@ export default function App() {
     setMybkCustomItems((prev) => [...prev, { id, category: 'Ghi chú thêm', text: cleanTxt }]);
     setMybkSelectedIds((prev) => ({ ...prev, [id]: true }));
     setProfDraftEdited(null);
+    toast.success('Đã thêm mục ghi chú vào Khung Note Báo Cô!');
   };
 
   const scrollToProfPanel = () => {
@@ -634,9 +494,10 @@ export default function App() {
     try {
       await navigator.clipboard.writeText(finalProfText);
       setCopiedProf(true);
+      toast.success('Đã sao chép nội dung báo Cô vào Clipboard!');
       setTimeout(() => setCopiedProf(false), 2500);
     } catch {
-      // Fallback
+      toast.error('Không thể copy tự động, vui lòng bôi đen văn bản.');
     }
   };
 
@@ -648,6 +509,7 @@ export default function App() {
     link.href = URL.createObjectURL(blob);
     link.download = 'Note_File_MyBK_Bao_Co.txt';
     link.click();
+    toast.success('Đã tải xuống file Note_File_MyBK_Bao_Co.txt');
   };
 
   const handleDownloadPrettyCopyFor = async (targetKey) => {
@@ -673,8 +535,10 @@ export default function App() {
           includeSummarySheet,
         },
       });
+      toast.success(`Đã xuất bản sao tô đỏ cho ${targetRes.fileLabel}!`);
     } catch (err) {
       setError(`Lỗi khi xuất bản sao ${targetRes.fileLabel}: ${err.message}`);
+      toast.error(`Lỗi xuất file: ${err.message}`);
     } finally {
       setExportingKey(null);
     }
@@ -733,10 +597,25 @@ export default function App() {
     );
     link.download = `ra_soat_${currentScopeKey}.csv`;
     link.click();
+    toast.success(`Đã xuất báo cáo CSV cho ${currentRes.fileLabel}`);
+  };
+
+  // Bộ lọc tìm kiếm nhanh toàn cục (không làm thay đổi logic bộ lọc gốc khi để trống)
+  const normSearch = searchQuery.trim().toLowerCase();
+  const matchesQuery = (code, name, extra = '') => {
+    if (!normSearch) return true;
+    return (
+      String(code || '').toLowerCase().includes(normSearch) ||
+      String(name || '').toLowerCase().includes(normSearch) ||
+      String(extra || '').toLowerCase().includes(normSearch)
+    );
   };
 
   const filteredRows = currentRes?.rowResults.filter((r) => {
-    if (r.type === 'group' || r.type === 'separator') return rowFilter === 'all';
+    if (r.type === 'group' || r.type === 'separator') {
+      return rowFilter === 'all' && !normSearch;
+    }
+    if (!matchesQuery(r.code || r.parentCode, r.name, r.pEntry?.name)) return false;
     if (rowFilter === 'all') return true;
     if (rowFilter === 'wrong-group') return r.groupMismatch;
     if (rowFilter === 'wrong-prereq') return r.prereqMismatch;
@@ -744,6 +623,7 @@ export default function App() {
   });
 
   const filteredSpelling = currentRes?.spellingIssues.filter((sp) => {
+    if (!matchesQuery(sp.code, sp.text, sp.detail)) return false;
     if (spellFilter === 'all') return true;
     if (spellFilter === 'pretty_only') return !sp.alsoInMybk;
     if (spellFilter === 'from_mybk') return sp.alsoInMybk;
@@ -751,6 +631,7 @@ export default function App() {
   });
 
   const filteredPrereqCourses = currentRes?.allPrereqCourses.filter((r) => {
+    if (!matchesQuery(r.code, r.name, r.prereq)) return false;
     if (prereqFilter === 'mismatch') return r.prereqMismatch;
     if (prereqFilter === 'tq-only') {
       const hasOrigTQ = r.prereqItems?.some((i) => i.type === 'TQ');
@@ -761,6 +642,7 @@ export default function App() {
   });
 
   const filteredB4Rows = currentRes?.prettyCoursesList.filter((item) => {
+    if (!matchesQuery(item.code, item.name, item.eng)) return false;
     if (b4Filter === 'issues') return item.severity !== 'ok';
     if (b4Filter === 'noted') {
       return Boolean(
@@ -780,28 +662,41 @@ export default function App() {
     if (!stats) return null;
     if (stepId === 'b1') {
       return stats.b1Issues > 0 ? (
-        <span className="tb tb-warn">{stats.b1Issues} lệch</span>
+        <span className="tb tb-warn">
+          <AlertTriangle size={11} /> {stats.b1Issues} lệch
+        </span>
       ) : (
-        <span className="tb tb-ok">✓ Đúng nhóm</span>
+        <span className="tb tb-ok">
+          <CheckCircle2 size={11} /> Đúng nhóm
+        </span>
       );
     }
     if (stepId === 'b2') {
       return stats.b2Issues > 0 ? (
-        <span className="tb tb-red">{stats.b2Issues} lỗi</span>
+        <span className="tb tb-red">
+          <XCircle size={11} /> {stats.b2Issues} lỗi
+        </span>
       ) : (
-        <span className="tb tb-ok">✓ Khớp</span>
+        <span className="tb tb-ok">
+          <CheckCircle2 size={11} /> Khớp
+        </span>
       );
     }
     if (stepId === 'b3') {
       return stats.b3Issues > 0 ? (
-        <span className="tb tb-pink">⚡ {stats.b3Issues} cần xử lý</span>
+        <span className="tb tb-pink">
+          <Zap size={11} /> {stats.b3Issues} cần xử lý
+        </span>
       ) : (
-        <span className="tb tb-ok">✓ Chuẩn ĐK</span>
+        <span className="tb tb-ok">
+          <CheckCircle2 size={11} /> Chuẩn ĐK
+        </span>
       );
     }
     if (stepId === 'b4') {
       return (
         <span className="tb tb-red">
+          <FileWarning size={11} />
           {stats.totalFileErrors > 0
             ? `${stats.totalFileErrors} ô tô đỏ`
             : 'Xuất bản sao'}
@@ -813,194 +708,353 @@ export default function App() {
 
   return (
     <>
-      <style>{STYLES}</style>
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        theme={theme === 'dark' ? 'dark' : 'light'}
+      />
+
+      {/* =====================================================================
+          TOP STICKY COMMAND NAVBAR
+      ===================================================================== */}
+      <header className="top-navbar">
+        <div className="top-navbar-inner">
+          <div className="brand-cluster">
+            <div className="brand-logo">
+              <BookOpenCheck size={22} strokeWidth={2.2} />
+            </div>
+            <div className="brand-title-wrap">
+              <div className="brand-eyebrow">
+                <Sparkles size={11} /> CURRICULUM AUDIT STUDIO • V3.5
+              </div>
+              <div className="brand-title">
+                web check siu cấp vip pro
+                {reviewData && (
+                  <span className="tb tb-blue" style={{ fontSize: 10 }}>
+                    Đã nạp kết quả
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="nav-actions">
+            {/* Thanh tìm kiếm nhanh Mã môn / Tên môn */}
+            {reviewData && (
+              <div className="global-search-wrap">
+                <Search size={14} className="global-search-icon" />
+                <input
+                  type="text"
+                  className="global-search-input"
+                  placeholder="Tìm nhanh mã môn, tên môn..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    className="global-search-clear"
+                    onClick={() => setSearchQuery('')}
+                    title="Xoá tìm kiếm"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Nút thu gọn / mở rộng khung tải file khi đã có kết quả */}
+            {reviewData && (
+              <button
+                className="fh-btn"
+                onClick={() => setCollapseUploads((prev) => !prev)}
+                title="Thu gọn hoặc mở rộng 3 ô chọn file Excel"
+              >
+                {collapseUploads ? (
+                  <>
+                    <ChevronDown size={14} /> Mở khung 3 File
+                  </>
+                ) : (
+                  <>
+                    <ChevronUp size={14} /> Thu gọn khung File
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Bộ chuyển đổi giao diện (Theme Switcher) */}
+            <div className="theme-switcher" role="group" aria-label="Chọn giao diện">
+              <button
+                className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
+                onClick={() => setTheme('light')}
+                title="Giao diện Sáng Studio (Mặc định mới)"
+              >
+                <Sun size={13} /> Sáng Studio
+              </button>
+              <button
+                className={`theme-btn ${theme === 'emerald' ? 'active' : ''}`}
+                onClick={() => setTheme('emerald')}
+                title="Giao diện Excel Emerald"
+              >
+                <Palette size={13} /> Emerald
+              </button>
+              <button
+                className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
+                onClick={() => setTheme('dark')}
+                title="Giao diện Tối Obsidian Glass"
+              >
+                <Moon size={13} /> Tối Glass
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
       <div className="app">
-        <div className="header">
-          <div className="header-tag">WEB CHECK SIU CẤP VIP PRO • V3.5</div>
-          <h1>web check siu cấp vip pro</h1>
-          <p>
-            Hỗ trợ tải cùng lúc <strong>3 file</strong> (1 File gốc MyBK + Bản đẹp CTĐT +
-            Bản đẹp KHGD). Tự động <strong>tách riêng lỗi nằm ở file nào</strong>: File bản
-            đẹp bị thiếu/sai sẽ xuất bản sao với <strong>chữ đỏ / highlight ô đỏ</strong>{' '}
-            ở B4; lỗi gốc từ hệ thống MyBK được tổng hợp vào{' '}
-            <strong>Khung Note riêng để báo Cô</strong>.
-          </p>
+        {/* =====================================================================
+            WORKSPACE INTRO BANNER
+        ===================================================================== */}
+        <div className="workspace-banner">
+          <div className="workspace-banner-left">
+            <div className="workspace-banner-title">
+              <FolderKanban size={18} style={{ color: 'var(--accent)' }} />
+              Hệ thống đối chiếu đồng thời 3 File Chương trình Đào tạo
+            </div>
+            <p className="workspace-banner-desc">
+              Hỗ trợ tải cùng lúc <strong>3 file</strong> (1 File gốc MyBK + Bản đẹp CTĐT +
+              Bản đẹp KHGD). Tự động <strong>tách riêng lỗi nằm ở file nào</strong>: File bản
+              đẹp bị thiếu/sai sẽ xuất bản sao với <strong>chữ đỏ / highlight ô đỏ</strong>{' '}
+              ở B4; lỗi gốc từ hệ thống MyBK được tổng hợp vào{' '}
+              <strong>Khung Note riêng để báo Cô</strong>.
+            </p>
+          </div>
+          {reviewData && (
+            <div className="workspace-banner-right">
+              <button className="fh-btn btn-orange" onClick={scrollToProfPanel}>
+                <Send size={13} /> Khung Note Báo Cô (
+                {Object.values(mybkSelectedIds).filter(Boolean).length})
+              </button>
+            </div>
+          )}
         </div>
 
         {/* =====================================================================
             KHỐI TẢI LÊN 3 FILE (1 MYBK + 2 BẢN ĐẸP: CTĐT & KHGD)
         ===================================================================== */}
-        <div className="upload-grid-3">
-          {/* FILE 1: GỐC MYBK */}
-          <div
-            className={`upload-card card-mybk ${fileMybk ? 'has-file' : ''} ${
-              dragMybk ? 'drag-over' : ''
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragMybk(true);
-            }}
-            onDragLeave={() => setDragMybk(false)}
-            onDrop={onDropFile('mybk', setDragMybk)}
-          >
-            {fileMybk && (
-              <button
-                className="clear-file-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFileMybk(null);
-                }}
-              >
-                ✕ Gỡ
-              </button>
-            )}
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={onPickFile('mybk')}
-            />
-            <div className="upload-icon">🏛️</div>
-            <div className="upload-label" style={{ color: 'var(--orange)' }}>
-              File 1 — Gốc MyBK (Bắt buộc)
-            </div>
-            <div className="upload-title">
-              {fileMybk ? fileMybk.name : 'Chọn File tải từ MyBK'}
-            </div>
-            <div className="upload-desc">
-              Gồm 2 sheet gốc: Khối kiến thức & Kế hoạch giảng dạy. Các bất cập từ file
-              này sẽ gom vào Khung Note báo Cô.
-            </div>
-            {fileMybk && (
-              <div
-                className="upload-filename"
-                style={{
-                  color: '#fdba74',
-                  background: 'rgba(249,115,22,.15)',
-                }}
-              >
-                ✓ {fileMybk.name}
+        <AnimatePresence initial={false}>
+          {!collapseUploads && (
+            <motion.div
+              className="upload-section-wrap"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.22 }}
+            >
+              <div className="upload-grid-3">
+                {/* FILE 1: GỐC MYBK */}
+                <div
+                  className={`upload-card card-mybk ${fileMybk ? 'has-file' : ''} ${
+                    dragMybk ? 'drag-over' : ''
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragMybk(true);
+                  }}
+                  onDragLeave={() => setDragMybk(false)}
+                  onDrop={onDropFile('mybk', setDragMybk)}
+                >
+                  {fileMybk && (
+                    <button
+                      className="clear-file-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFileMybk(null);
+                        toast.info('Đã gỡ File 1 (Gốc MyBK)');
+                      }}
+                    >
+                      <X size={12} /> Gỡ
+                    </button>
+                  )}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={onPickFile('mybk')}
+                  />
+                  <div>
+                    <div className="upload-icon-box">
+                      <Building2 size={22} />
+                    </div>
+                    <div className="upload-label" style={{ color: 'var(--orange)' }}>
+                      File 1 — Gốc MyBK (Bắt buộc)
+                    </div>
+                    <div className="upload-title">
+                      {fileMybk ? fileMybk.name : 'Chọn File tải từ MyBK'}
+                    </div>
+                    <div className="upload-desc">
+                      Gồm 2 sheet gốc: Khối kiến thức & Kế hoạch giảng dạy. Các bất cập từ
+                      file này sẽ gom vào Khung Note báo Cô.
+                    </div>
+                  </div>
+                  {fileMybk && (
+                    <div
+                      className="upload-filename"
+                      style={{
+                        color: 'var(--orange)',
+                        background: 'var(--orange-soft)',
+                      }}
+                    >
+                      <CheckCircle2 size={13} /> {fileMybk.name}
+                    </div>
+                  )}
+                </div>
+
+                {/* FILE 2: BẢN ĐẸP CTĐT */}
+                <div
+                  className={`upload-card card-ctdt ${fileCtdtPretty ? 'has-file' : ''} ${
+                    dragCtdt ? 'drag-over' : ''
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragCtdt(true);
+                  }}
+                  onDragLeave={() => setDragCtdt(false)}
+                  onDrop={onDropFile('ctdt', setDragCtdt)}
+                >
+                  {fileCtdtPretty && (
+                    <button
+                      className="clear-file-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFileCtdtPretty(null);
+                        toast.info('Đã gỡ File 2 (Bản đẹp CTĐT)');
+                      }}
+                    >
+                      <X size={12} /> Gỡ
+                    </button>
+                  )}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={onPickFile('ctdt')}
+                  />
+                  <div>
+                    <div className="upload-icon-box">
+                      <FileSpreadsheet size={22} />
+                    </div>
+                    <div className="upload-label" style={{ color: 'var(--accent)' }}>
+                      File 2 — Bản đẹp CTĐT (Khối kiến thức)
+                    </div>
+                    <div className="upload-title">
+                      {fileCtdtPretty ? fileCtdtPretty.name : 'Chọn File CTDT_... bản đẹp'}
+                    </div>
+                    <div className="upload-desc">
+                      Dò với sheet Khối kiến thức MyBK. Nếu thiếu/sai sẽ xuất bản sao tô đỏ
+                      ô lỗi ở B4.
+                    </div>
+                  </div>
+                  {fileCtdtPretty && (
+                    <div
+                      className="upload-filename"
+                      style={{
+                        color: 'var(--accent)',
+                        background: 'var(--accent-soft)',
+                      }}
+                    >
+                      <CheckCircle2 size={13} /> {fileCtdtPretty.name}
+                    </div>
+                  )}
+                </div>
+
+                {/* FILE 3: BẢN ĐẸP KHGD */}
+                <div
+                  className={`upload-card card-khgd ${fileKhgdPretty ? 'has-file' : ''} ${
+                    dragKhgd ? 'drag-over' : ''
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragKhgd(true);
+                  }}
+                  onDragLeave={() => setDragKhgd(false)}
+                  onDrop={onDropFile('khgd', setDragKhgd)}
+                >
+                  {fileKhgdPretty && (
+                    <button
+                      className="clear-file-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFileKhgdPretty(null);
+                        toast.info('Đã gỡ File 3 (Bản đẹp KHGD)');
+                      }}
+                    >
+                      <X size={12} /> Gỡ
+                    </button>
+                  )}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={onPickFile('khgd')}
+                  />
+                  <div>
+                    <div className="upload-icon-box">
+                      <CalendarRange size={22} />
+                    </div>
+                    <div className="upload-label" style={{ color: 'var(--teal)' }}>
+                      File 3 — Bản đẹp KHGD (Kế hoạch giảng dạy)
+                    </div>
+                    <div className="upload-title">
+                      {fileKhgdPretty ? fileKhgdPretty.name : 'Chọn File KHGD_... bản đẹp'}
+                    </div>
+                    <div className="upload-desc">
+                      Dò với sheet KHGD MyBK & đối chiếu chéo với CTĐT đẹp. Xuất bản sao
+                      KHGD tô đỏ ô lỗi ở B4.
+                    </div>
+                  </div>
+                  {fileKhgdPretty && (
+                    <div
+                      className="upload-filename"
+                      style={{
+                        color: 'var(--teal)',
+                        background: 'var(--teal-soft)',
+                      }}
+                    >
+                      <CheckCircle2 size={13} /> {fileKhgdPretty.name}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* FILE 2: BẢN ĐẸP CTĐT */}
-          <div
-            className={`upload-card card-ctdt ${fileCtdtPretty ? 'has-file' : ''} ${
-              dragCtdt ? 'drag-over' : ''
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragCtdt(true);
-            }}
-            onDragLeave={() => setDragCtdt(false)}
-            onDrop={onDropFile('ctdt', setDragCtdt)}
-          >
-            {fileCtdtPretty && (
               <button
-                className="clear-file-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFileCtdtPretty(null);
-                }}
+                className="run-btn"
+                onClick={handleRun}
+                disabled={!fileMybk || (!fileCtdtPretty && !fileKhgdPretty) || loading}
               >
-                ✕ Gỡ
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="spin-icon" />
+                    Đang phân tích & tách lỗi theo từng file...
+                  </>
+                ) : fileCtdtPretty && fileKhgdPretty ? (
+                  <>
+                    <Play size={17} fill="currentColor" />
+                    Bắt đầu rà soát cả 3 File (MyBK + Bản đẹp CTĐT + Bản đẹp KHGD)
+                  </>
+                ) : (
+                  <>
+                    <Play size={17} fill="currentColor" />
+                    Bắt đầu rà soát các File đã chọn
+                  </>
+                )}
               </button>
-            )}
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={onPickFile('ctdt')}
-            />
-            <div className="upload-icon">📘</div>
-            <div className="upload-label" style={{ color: 'var(--accent)' }}>
-              File 2 — Bản đẹp CTĐT (Khối kiến thức)
-            </div>
-            <div className="upload-title">
-              {fileCtdtPretty ? fileCtdtPretty.name : 'Chọn File CTDT_... bản đẹp'}
-            </div>
-            <div className="upload-desc">
-              Dò với sheet Khối kiến thức MyBK. Nếu thiếu/sai sẽ xuất bản sao tô đỏ ô lỗi
-              ở B4.
-            </div>
-            {fileCtdtPretty && (
-              <div
-                className="upload-filename"
-                style={{
-                  color: '#93c5fd',
-                  background: 'rgba(79,142,247,.16)',
-                }}
-              >
-                ✓ {fileCtdtPretty.name}
-              </div>
-            )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {error && (
+          <div className="error-box">
+            <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+            <div>{error}</div>
           </div>
-
-          {/* FILE 3: BẢN ĐẸP KHGD */}
-          <div
-            className={`upload-card card-khgd ${fileKhgdPretty ? 'has-file' : ''} ${
-              dragKhgd ? 'drag-over' : ''
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragKhgd(true);
-            }}
-            onDragLeave={() => setDragKhgd(false)}
-            onDrop={onDropFile('khgd', setDragKhgd)}
-          >
-            {fileKhgdPretty && (
-              <button
-                className="clear-file-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFileKhgdPretty(null);
-                }}
-              >
-                ✕ Gỡ
-              </button>
-            )}
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={onPickFile('khgd')}
-            />
-            <div className="upload-icon">📗</div>
-            <div className="upload-label" style={{ color: 'var(--teal)' }}>
-              File 3 — Bản đẹp KHGD (Kế hoạch giảng dạy)
-            </div>
-            <div className="upload-title">
-              {fileKhgdPretty ? fileKhgdPretty.name : 'Chọn File KHGD_... bản đẹp'}
-            </div>
-            <div className="upload-desc">
-              Dò với sheet KHGD MyBK & đối chiếu chéo với CTĐT đẹp. Xuất bản sao KHGD tô
-              đỏ ô lỗi ở B4.
-            </div>
-            {fileKhgdPretty && (
-              <div
-                className="upload-filename"
-                style={{
-                  color: '#5eead4',
-                  background: 'rgba(20,184,166,.16)',
-                }}
-              >
-                ✓ {fileKhgdPretty.name}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <button
-          className="run-btn"
-          onClick={handleRun}
-          disabled={!fileMybk || (!fileCtdtPretty && !fileKhgdPretty) || loading}
-        >
-          {loading
-            ? '⏳ Đang phân tích & tách lỗi theo từng file...'
-            : fileCtdtPretty && fileKhgdPretty
-            ? '🔍 Bắt đầu rà soát cả 3 File (MyBK + Bản đẹp CTĐT + Bản đẹp KHGD)'
-            : '🔍 Bắt đầu rà soát các File đã chọn'}
-        </button>
-
-        {error && <div className="error-box">⚠️ {error}</div>}
+        )}
 
         {/* =====================================================================
             BẢNG PHÂN TÁCH LỖI RÕ RÀNG THEO TỪNG FILE: SAI Ở FILE NÀO?
@@ -1015,15 +1069,12 @@ export default function App() {
                     ? 'active-scope'
                     : ''
                 }`}
-                style={{
-                  borderColor: reviewData.ctdtResult
-                    ? 'rgba(79,142,247,.45)'
-                    : 'var(--border)',
-                }}
               >
                 <div>
                   <div className="fh-top">
-                    <span className="fh-tag fo-ctdt">📘 File 2 • Bản đẹp CTĐT</span>
+                    <span className="fh-tag fo-ctdt">
+                      <FileSpreadsheet size={13} /> File 2 • Bản đẹp CTĐT
+                    </span>
                     {reviewData.ctdtResult ? (
                       reviewData.ctdtResult.stats.totalFileErrors > 0 ? (
                         <span className="tb tb-red">
@@ -1036,33 +1087,47 @@ export default function App() {
                       <span className="tb b-skip">Chưa tải lên</span>
                     )}
                   </div>
-                  <div className="fh-title">
+                  <div className="fh-title" title={fileCtdtPretty?.name}>
                     {fileCtdtPretty ? fileCtdtPretty.name : 'Chưa chọn Bản đẹp CTĐT'}
                   </div>
                   {reviewData.ctdtResult ? (
-                    <div className="fh-breakdown">
-                      • Sót/thừa môn:{' '}
-                      <b>
-                        {reviewData.ctdtResult.stats.miss +
-                          reviewData.ctdtResult.stats.extra}
-                      </b>{' '}
-                      &nbsp;|&nbsp; Lệch nhóm/BB-TC:{' '}
-                      <b>
-                        {reviewData.ctdtResult.stats.groupMismatch +
-                          reviewData.ctdtResult.stats.categoryMismatch}
-                      </b>
-                      <br />• Sai Tên/Tín chỉ:{' '}
-                      <b>
-                        {reviewData.ctdtResult.stats.wrong +
-                          reviewData.ctdtResult.stats.creditMismatch}
-                      </b>{' '}
-                      &nbsp;|&nbsp; Chính tả:{' '}
-                      <b>{reviewData.ctdtResult.stats.typoCount}</b>
-                      <br />• Thiếu/sai Tiên quyết:{' '}
-                      <b style={{ color: '#f472b6' }}>
-                        {reviewData.ctdtResult.stats.wrongPrereq}
-                      </b>
-                    </div>
+                    <>
+                      <div className="fh-kpi-grid">
+                        <div className="fh-kpi-box">
+                          <span className="fh-kpi-label">Sót / Thừa môn</span>
+                          <span className="fh-kpi-val">
+                            {reviewData.ctdtResult.stats.miss +
+                              reviewData.ctdtResult.stats.extra}
+                          </span>
+                        </div>
+                        <div className="fh-kpi-box">
+                          <span className="fh-kpi-label">Lệch Nhóm / BB-TC</span>
+                          <span className="fh-kpi-val">
+                            {reviewData.ctdtResult.stats.groupMismatch +
+                              reviewData.ctdtResult.stats.categoryMismatch}
+                          </span>
+                        </div>
+                        <div className="fh-kpi-box">
+                          <span className="fh-kpi-label">Sai Tên/TC & Chính tả</span>
+                          <span className="fh-kpi-val">
+                            {reviewData.ctdtResult.stats.wrong +
+                              reviewData.ctdtResult.stats.creditMismatch}{' '}
+                            <span style={{ fontSize: 11, color: 'var(--text2)' }}>
+                              ({reviewData.ctdtResult.stats.typoCount} CT)
+                            </span>
+                          </span>
+                        </div>
+                        <div className="fh-kpi-box">
+                          <span className="fh-kpi-label">Thiếu / Sai Tiên quyết</span>
+                          <span
+                            className="fh-kpi-val"
+                            style={{ color: 'var(--pink)' }}
+                          >
+                            {reviewData.ctdtResult.stats.wrongPrereq}
+                          </span>
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <div className="fh-breakdown">
                       Bạn có thể tải thêm file Bản đẹp CTĐT ở ô phía trên để rà soát đồng
@@ -1076,7 +1141,7 @@ export default function App() {
                       className="fh-btn"
                       onClick={() => setActiveFileScope('ctdt')}
                     >
-                      👁️ Xem chi tiết CTĐT đẹp
+                      <Eye size={13} /> Xem chi tiết CTĐT đẹp
                     </button>
                     <button
                       className="fh-btn btn-red"
@@ -1085,7 +1150,7 @@ export default function App() {
                         setActiveStep('b4');
                       }}
                     >
-                      🖍️ Tạo bản sao CTĐT tô đỏ
+                      <FileWarning size={13} /> Tạo bản sao CTĐT tô đỏ
                     </button>
                   </div>
                 )}
@@ -1098,15 +1163,12 @@ export default function App() {
                     ? 'active-scope'
                     : ''
                 }`}
-                style={{
-                  borderColor: reviewData.khgdResult
-                    ? 'rgba(20,184,166,.45)'
-                    : 'var(--border)',
-                }}
               >
                 <div>
                   <div className="fh-top">
-                    <span className="fh-tag fo-khgd">📗 File 3 • Bản đẹp KHGD</span>
+                    <span className="fh-tag fo-khgd">
+                      <CalendarRange size={13} /> File 3 • Bản đẹp KHGD
+                    </span>
                     {reviewData.khgdResult ? (
                       reviewData.khgdResult.stats.totalFileErrors > 0 ? (
                         <span className="tb tb-red">
@@ -1119,33 +1181,47 @@ export default function App() {
                       <span className="tb b-skip">Chưa tải lên</span>
                     )}
                   </div>
-                  <div className="fh-title">
+                  <div className="fh-title" title={fileKhgdPretty?.name}>
                     {fileKhgdPretty ? fileKhgdPretty.name : 'Chưa chọn Bản đẹp KHGD'}
                   </div>
                   {reviewData.khgdResult ? (
-                    <div className="fh-breakdown">
-                      • Sót/thừa môn:{' '}
-                      <b>
-                        {reviewData.khgdResult.stats.miss +
-                          reviewData.khgdResult.stats.extra}
-                      </b>{' '}
-                      &nbsp;|&nbsp; Sai HK/BB-TC:{' '}
-                      <b>
-                        {reviewData.khgdResult.stats.groupMismatch +
-                          reviewData.khgdResult.stats.categoryMismatch}
-                      </b>
-                      <br />• Sai Tên/Tín chỉ:{' '}
-                      <b>
-                        {reviewData.khgdResult.stats.wrong +
-                          reviewData.khgdResult.stats.creditMismatch}
-                      </b>{' '}
-                      &nbsp;|&nbsp; Chính tả:{' '}
-                      <b>{reviewData.khgdResult.stats.typoCount}</b>
-                      <br />• Thiếu/sai Tiên quyết:{' '}
-                      <b style={{ color: '#f472b6' }}>
-                        {reviewData.khgdResult.stats.wrongPrereq}
-                      </b>
-                    </div>
+                    <>
+                      <div className="fh-kpi-grid">
+                        <div className="fh-kpi-box">
+                          <span className="fh-kpi-label">Sót / Thừa môn</span>
+                          <span className="fh-kpi-val">
+                            {reviewData.khgdResult.stats.miss +
+                              reviewData.khgdResult.stats.extra}
+                          </span>
+                        </div>
+                        <div className="fh-kpi-box">
+                          <span className="fh-kpi-label">Sai HK / BB-TC</span>
+                          <span className="fh-kpi-val">
+                            {reviewData.khgdResult.stats.groupMismatch +
+                              reviewData.khgdResult.stats.categoryMismatch}
+                          </span>
+                        </div>
+                        <div className="fh-kpi-box">
+                          <span className="fh-kpi-label">Sai Tên/TC & Chính tả</span>
+                          <span className="fh-kpi-val">
+                            {reviewData.khgdResult.stats.wrong +
+                              reviewData.khgdResult.stats.creditMismatch}{' '}
+                            <span style={{ fontSize: 11, color: 'var(--text2)' }}>
+                              ({reviewData.khgdResult.stats.typoCount} CT)
+                            </span>
+                          </span>
+                        </div>
+                        <div className="fh-kpi-box">
+                          <span className="fh-kpi-label">Thiếu / Sai Tiên quyết</span>
+                          <span
+                            className="fh-kpi-val"
+                            style={{ color: 'var(--pink)' }}
+                          >
+                            {reviewData.khgdResult.stats.wrongPrereq}
+                          </span>
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <div className="fh-breakdown">
                       Tải thêm file Bản đẹp KHGD vào ô số 3 phía trên nếu bạn muốn dò luôn
@@ -1159,7 +1235,7 @@ export default function App() {
                       className="fh-btn"
                       onClick={() => setActiveFileScope('khgd')}
                     >
-                      👁️ Xem chi tiết KHGD đẹp
+                      <Eye size={13} /> Xem chi tiết KHGD đẹp
                     </button>
                     <button
                       className="fh-btn btn-red"
@@ -1168,42 +1244,56 @@ export default function App() {
                         setActiveStep('b4');
                       }}
                     >
-                      🖍️ Tạo bản sao KHGD tô đỏ
+                      <FileWarning size={13} /> Tạo bản sao KHGD tô đỏ
                     </button>
                   </div>
                 )}
               </div>
 
               {/* THẺ 3: LỖI GỐC TỪ FILE MYBK -> BÁO RIÊNG VỚI CÔ */}
-              <div
-                className="file-health-card"
-                style={{ borderColor: 'rgba(249,115,22,.45)' }}
-              >
+              <div className="file-health-card">
                 <div>
                   <div className="fh-top">
-                    <span className="fh-tag fo-mybk">🏛️ File 1 • Gốc MyBK (Báo Cô)</span>
+                    <span className="fh-tag fo-mybk">
+                      <Building2 size={13} /> File 1 • Gốc MyBK (Báo Cô)
+                    </span>
                     <span className="tb tb-orange">
                       {reviewData.mybkAudit.totalIssues + mybkCustomItems.length} mục báo
                       Cô
                     </span>
                   </div>
-                  <div className="fh-title">{fileMybk?.name}</div>
-                  <div className="fh-breakdown">
-                    • Lệch mục BB/TC giữa 2 sheet MyBK:{' '}
-                    <b>{reviewData.mybkAudit.khgdMisplacedSubgroups.length} nhóm</b> (
-                    {reviewData.mybkAudit.bbInTcIssues.length} môn)
-                    <br />• Chính tả gốc từ hệ thống MyBK:{' '}
-                    <b>{reviewData.mybkAudit.mybkTypos.length} lỗi</b>
-                    <br />• Khác biệt danh mục/ĐK 2 sheet MyBK:{' '}
-                    <b>
-                      {reviewData.mybkAudit.missingInKhgd.length +
-                        reviewData.mybkAudit.prereqCrossIssues.length}
-                    </b>
+                  <div className="fh-title" title={fileMybk?.name}>
+                    {fileMybk?.name}
+                  </div>
+                  <div className="fh-kpi-grid">
+                    <div className="fh-kpi-box">
+                      <span className="fh-kpi-label">Lệch BB/TC 2 sheet</span>
+                      <span className="fh-kpi-val" style={{ color: 'var(--orange)' }}>
+                        {reviewData.mybkAudit.khgdMisplacedSubgroups.length} nhóm (
+                        {reviewData.mybkAudit.bbInTcIssues.length} môn)
+                      </span>
+                    </div>
+                    <div className="fh-kpi-box">
+                      <span className="fh-kpi-label">Chính tả gốc MyBK</span>
+                      <span className="fh-kpi-val">
+                        {reviewData.mybkAudit.mybkTypos.length} lỗi
+                      </span>
+                    </div>
+                    <div className="fh-kpi-box" style={{ gridColumn: 'span 2' }}>
+                      <span className="fh-kpi-label">
+                        Khác biệt danh mục / điều kiện giữa 2 sheet MyBK
+                      </span>
+                      <span className="fh-kpi-val">
+                        {reviewData.mybkAudit.missingInKhgd.length +
+                          reviewData.mybkAudit.prereqCrossIssues.length}{' '}
+                        mục
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="fh-actions">
                   <button className="fh-btn btn-orange" onClick={scrollToProfPanel}>
-                    📨 Mở Khung Note Báo Riêng Với Cô ↓
+                    <Send size={13} /> Mở Khung Note Báo Riêng Với Cô ↓
                   </button>
                 </div>
               </div>
@@ -1212,7 +1302,10 @@ export default function App() {
             {/* CẢNH BÁO NẾU 2 FILE BẢN ĐẸP (CTĐT ĐẸP & KHGD ĐẸP) LỆCH NHAU */}
             {reviewData.prettyCrossDiffs.length > 0 && (
               <div className="alert-banner alert-warn">
-                <span>⚡</span>
+                <AlertTriangle
+                  size={18}
+                  style={{ color: 'var(--yellow)', flexShrink: 0, marginTop: 2 }}
+                />
                 <div style={{ width: '100%' }}>
                   <strong>
                     Phát hiện {reviewData.prettyCrossDiffs.length} điểm chưa đồng bộ giữa
@@ -1220,8 +1313,8 @@ export default function App() {
                   </strong>
                   <div style={{ marginTop: 6, fontSize: 12 }}>
                     {reviewData.prettyCrossDiffs.slice(0, 6).map((d, i) => (
-                      <div key={i} style={{ marginBottom: 3 }}>
-                        • <code>{d.code}</code> ({d.name}) —{' '}
+                      <div key={i} style={{ marginBottom: 4 }}>
+                        • <code className="code-cell">{d.code}</code> ({d.name}) —{' '}
                         <span className="file-origin-tag fo-err">{d.type}</span>:{' '}
                         {d.detail}
                       </div>
@@ -1239,8 +1332,17 @@ export default function App() {
             {/* THANH CHUYỂN ĐỔI FILE BẢN ĐẸP ĐANG XEM TRONG CÁC BƯỚC B1 -> B4 */}
             <div className="scope-bar">
               <div className="scope-btns">
-                <span style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>
-                  📂 Đang xem kết quả rà soát của:
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text2)',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <SlidersHorizontal size={14} /> Đang xem kết quả rà soát của:
                 </span>
                 {reviewData.ctdtResult && (
                   <button
@@ -1249,7 +1351,8 @@ export default function App() {
                     }`}
                     onClick={() => setActiveFileScope('ctdt')}
                   >
-                    📘 Bản đẹp CTĐT ({fileCtdtPretty?.name})
+                    <FileSpreadsheet size={15} />
+                    Bản đẹp CTĐT ({fileCtdtPretty?.name})
                     <span
                       className={`tb ${
                         reviewData.ctdtResult.stats.totalFileErrors > 0
@@ -1268,7 +1371,8 @@ export default function App() {
                     }`}
                     onClick={() => setActiveFileScope('khgd')}
                   >
-                    📗 Bản đẹp KHGD ({fileKhgdPretty?.name})
+                    <CalendarRange size={15} />
+                    Bản đẹp KHGD ({fileKhgdPretty?.name})
                     <span
                       className={`tb ${
                         reviewData.khgdResult.stats.totalFileErrors > 0
@@ -1282,7 +1386,7 @@ export default function App() {
                 )}
               </div>
               <button className="fh-btn btn-orange" onClick={scrollToProfPanel}>
-                📨 Khung Note File MyBK báo Cô (
+                <Send size={13} /> Khung Note File MyBK báo Cô (
                 {Object.values(mybkSelectedIds).filter(Boolean).length})
               </button>
             </div>
@@ -1292,15 +1396,18 @@ export default function App() {
         {/* THANH QUY TRÌNH 4 BƯỚC (CÓ THỂ ĐỔI THỨ TỰ) */}
         <div className="stepper-header">
           <div className="stepper-hint">
-            🧭 <strong>Quy trình 4 bước rà soát:</strong> Có thể nhấn <code>◀</code>{' '}
-            <code>▶</code> để đổi thứ tự các bước theo thói quen làm việc của bạn.
+            <Info size={14} style={{ color: 'var(--accent)' }} />
+            <span>
+              <strong>Quy trình 4 bước rà soát:</strong> Có thể nhấn <code>◀</code>{' '}
+              <code>▶</code> để đổi thứ tự các bước theo thói quen làm việc của bạn.
+            </span>
           </div>
           {stepOrder.join(',') !== DEFAULT_STEP_ORDER.join(',') && (
             <button
               className="reset-order-btn"
               onClick={() => setStepOrder(DEFAULT_STEP_ORDER)}
             >
-              ↺ Đặt lại mặc định (B1 → B4)
+              <RotateCcw size={12} /> Đặt lại mặc định (B1 → B4)
             </button>
           )}
         </div>
@@ -1308,6 +1415,7 @@ export default function App() {
         <div className="stepper-grid">
           {stepOrder.map((stepId, idx) => {
             const meta = STEP_META[stepId];
+            const StepIcon = meta.icon;
             const isActive = currentRes ? activeStep === stepId : idx === 0;
             return (
               <div
@@ -1320,6 +1428,7 @@ export default function App() {
                 <div>
                   <div className="step-top">
                     <span className="step-num-tag">
+                      <StepIcon size={12} />
                       Bước {idx + 1} ({meta.code}) {meta.priority ? '★' : ''}
                     </span>
                     <div className="step-reorder" title="Đổi thứ tự bước này">
@@ -1343,7 +1452,7 @@ export default function App() {
                   <div className="step-desc">{meta.desc}</div>
                 </div>
                 <div className="step-footer">
-                  <span style={{ fontSize: 10.5, color: 'var(--text2)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500 }}>
                     {currentRes ? currentRes.fileLabel : 'Chờ chạy'}
                   </span>
                   {getStepBadge(stepId)}
@@ -1357,7 +1466,12 @@ export default function App() {
             CHI TIẾT TỪNG BƯỚC CHO FILE BẢN ĐẸP ĐANG CHỌN (CTĐT ĐẸP HOẶC KHGD ĐẸP)
         ===================================================================== */}
         {currentRes && (
-          <>
+          <motion.div
+            key={`${currentScopeKey}-${activeStep}`}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
             {/* =================================================================
                 BƯỚC B1: PHÂN NHÓM & BẮT BUỘC / TỰ CHỌN
             ================================================================= */}
@@ -1367,7 +1481,7 @@ export default function App() {
                 <div className="section-card">
                   <div className="section-head">
                     <div className="section-head-left">
-                      <span>🗂️</span>
+                      <Layers size={16} style={{ color: 'var(--accent)' }} />
                       <span className="section-head-title">
                         Kiểm tra Phân nhóm & Bắt buộc/Tự chọn trên{' '}
                         <span
@@ -1399,7 +1513,7 @@ export default function App() {
                   {currentRes.groupMismatches.length === 0 &&
                   currentRes.categoryMismatches.length === 0 &&
                   currentRes.khgdPrettyBbInTc.length === 0 ? (
-                    <div className="empty-state" style={{ padding: '26px 16px' }}>
+                    <div className="empty-state" style={{ padding: '28px 16px', border: 'none' }}>
                       <p>
                         ✅ Tất cả các môn trong <strong>{currentRes.fileLabel}</strong>{' '}
                         đều thuộc đúng {resMode === 'khgd' ? 'Học kỳ' : 'Nhóm kiến thức'}{' '}
@@ -1420,95 +1534,101 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {currentRes.groupMismatches.map((m, idx) => (
-                            <tr key={`gm-${idx}`}>
-                              <td>
-                                <span className="file-origin-tag fo-err">
-                                  Sai ở: {currentRes.fileLabel}
-                                </span>
-                              </td>
-                              <td className="code-cell">{m.code}</td>
-                              <td className="row-vi">{m.name}</td>
-                              <td>
-                                <b>{m.origGrp}</b> <CategoryBadge cat={m.origCat} />
-                              </td>
-                              <td>
-                                <b style={{ color: 'var(--red)' }}>{m.prettyGrp}</b>{' '}
-                                <CategoryBadge cat={m.prettyCat} />
-                              </td>
-                              <td>
-                                <input
-                                  className={`note-input ${
-                                    currentNotes[m.code] ? 'has-val' : ''
-                                  }`}
-                                  placeholder={`Note sửa trên ${currentRes.fileLabel}...`}
-                                  value={currentNotes[m.code] || ''}
-                                  onChange={(e) =>
-                                    updateNoteForFile(
-                                      currentScopeKey,
-                                      m.code,
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                          {currentRes.categoryMismatches.map((m, idx) => (
-                            <tr key={`cm-${idx}`}>
-                              <td>
-                                <span className="file-origin-tag fo-err">
-                                  Sai ở: {currentRes.fileLabel}
-                                </span>
-                              </td>
-                              <td className="code-cell">{m.code}</td>
-                              <td className="row-vi">{m.name}</td>
-                              <td>
-                                {m.origGrp} <CategoryBadge cat={m.origCat} />
-                              </td>
-                              <td>
-                                {m.prettyGrp} <CategoryBadge cat={m.prettyCat} />
-                              </td>
-                              <td>
-                                <input
-                                  className={`note-input ${
-                                    currentNotes[m.code] ? 'has-val' : ''
-                                  }`}
-                                  placeholder="Note chuyển mục BB/TC..."
-                                  value={currentNotes[m.code] || ''}
-                                  onChange={(e) =>
-                                    updateNoteForFile(
-                                      currentScopeKey,
-                                      m.code,
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                          {currentRes.khgdPrettyBbInTc.map((it, idx) => (
-                            <tr key={`kbb-${idx}`}>
-                              <td>
-                                <span className="file-origin-tag fo-khgd">
-                                  Lưu ý ở: Bản đẹp KHGD
-                                </span>
-                              </td>
-                              <td className="code-cell">{it.code}</td>
-                              <td className="row-vi">{it.name}</td>
-                              <td>
-                                Khối kiến thức ({it.ctdtGroup}):{' '}
-                                <CategoryBadge cat={it.ctdtCategory} />
-                              </td>
-                              <td>
-                                {it.khgdSemester}: <CategoryBadge cat={it.khgdCategory} />
-                              </td>
-                              <td style={{ fontSize: 11.5, color: 'var(--yellow)' }}>
-                                Môn [{it.ctdtCategory}] ở CTĐT nhưng nằm mục [
-                                {it.khgdCategory}] trên Bản đẹp KHGD
-                              </td>
-                            </tr>
-                          ))}
+                          {currentRes.groupMismatches
+                            .filter((m) => matchesQuery(m.code, m.name))
+                            .map((m, idx) => (
+                              <tr key={`gm-${idx}`}>
+                                <td>
+                                  <span className="file-origin-tag fo-err">
+                                    Sai ở: {currentRes.fileLabel}
+                                  </span>
+                                </td>
+                                <td className="code-cell">{m.code}</td>
+                                <td className="row-vi">{m.name}</td>
+                                <td>
+                                  <b>{m.origGrp}</b> <CategoryBadge cat={m.origCat} />
+                                </td>
+                                <td>
+                                  <b style={{ color: 'var(--red)' }}>{m.prettyGrp}</b>{' '}
+                                  <CategoryBadge cat={m.prettyCat} />
+                                </td>
+                                <td>
+                                  <input
+                                    className={`note-input ${
+                                      currentNotes[m.code] ? 'has-val' : ''
+                                    }`}
+                                    placeholder={`Note sửa trên ${currentRes.fileLabel}...`}
+                                    value={currentNotes[m.code] || ''}
+                                    onChange={(e) =>
+                                      updateNoteForFile(
+                                        currentScopeKey,
+                                        m.code,
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          {currentRes.categoryMismatches
+                            .filter((m) => matchesQuery(m.code, m.name))
+                            .map((m, idx) => (
+                              <tr key={`cm-${idx}`}>
+                                <td>
+                                  <span className="file-origin-tag fo-err">
+                                    Sai ở: {currentRes.fileLabel}
+                                  </span>
+                                </td>
+                                <td className="code-cell">{m.code}</td>
+                                <td className="row-vi">{m.name}</td>
+                                <td>
+                                  {m.origGrp} <CategoryBadge cat={m.origCat} />
+                                </td>
+                                <td>
+                                  {m.prettyGrp} <CategoryBadge cat={m.prettyCat} />
+                                </td>
+                                <td>
+                                  <input
+                                    className={`note-input ${
+                                      currentNotes[m.code] ? 'has-val' : ''
+                                    }`}
+                                    placeholder="Note chuyển mục BB/TC..."
+                                    value={currentNotes[m.code] || ''}
+                                    onChange={(e) =>
+                                      updateNoteForFile(
+                                        currentScopeKey,
+                                        m.code,
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          {currentRes.khgdPrettyBbInTc
+                            .filter((it) => matchesQuery(it.code, it.name))
+                            .map((it, idx) => (
+                              <tr key={`kbb-${idx}`}>
+                                <td>
+                                  <span className="file-origin-tag fo-khgd">
+                                    Lưu ý ở: Bản đẹp KHGD
+                                  </span>
+                                </td>
+                                <td className="code-cell">{it.code}</td>
+                                <td className="row-vi">{it.name}</td>
+                                <td>
+                                  Khối kiến thức ({it.ctdtGroup}):{' '}
+                                  <CategoryBadge cat={it.ctdtCategory} />
+                                </td>
+                                <td>
+                                  {it.khgdSemester}: <CategoryBadge cat={it.khgdCategory} />
+                                </td>
+                                <td style={{ fontSize: 11.5, color: 'var(--yellow)', fontWeight: 500 }}>
+                                  Môn [{it.ctdtCategory}] ở CTĐT nhưng nằm mục [
+                                  {it.khgdCategory}] trên Bản đẹp KHGD
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                       </table>
                     </div>
@@ -1520,7 +1640,7 @@ export default function App() {
                   <div className="section-card">
                     <div className="section-head">
                       <div className="section-head-left">
-                        <span>🏛️</span>
+                        <Building2 size={16} style={{ color: 'var(--orange)' }} />
                         <span className="section-head-title">
                           Phát hiện trên{' '}
                           <span className="file-origin-tag fo-mybk">
@@ -1534,7 +1654,7 @@ export default function App() {
                         className="fh-btn btn-orange"
                         onClick={scrollToProfPanel}
                       >
-                        📨 Đã tự động đưa vào Khung Note Báo Cô ↓
+                        <Send size={13} /> Đã tự động đưa vào Khung Note Báo Cô ↓
                       </button>
                     </div>
                     <div className="table-scroll" style={{ maxHeight: 300 }}>
@@ -1549,30 +1669,32 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {reviewData.mybkAudit.bbInTcIssues.map((it, idx) => (
-                            <tr key={idx}>
-                              <td>
-                                <span className="file-origin-tag fo-mybk">
-                                  Gốc MyBK (Báo Cô)
-                                </span>
-                              </td>
-                              <td className="code-cell">{it.code}</td>
-                              <td className="row-vi">{it.name}</td>
-                              <td>
-                                <b>{it.ctdtGroup}</b>{' '}
-                                <CategoryBadge cat={it.ctdtCategory} />
-                              </td>
-                              <td>
-                                <b>{it.khgdSemester}</b>{' '}
-                                <CategoryBadge cat={it.khgdCategory} />{' '}
-                                {it.khgdSubgroup && (
-                                  <span style={{ fontSize: 11, color: 'var(--text2)' }}>
-                                    ({it.khgdSubgroup})
+                          {reviewData.mybkAudit.bbInTcIssues
+                            .filter((it) => matchesQuery(it.code, it.name))
+                            .map((it, idx) => (
+                              <tr key={idx}>
+                                <td>
+                                  <span className="file-origin-tag fo-mybk">
+                                    Gốc MyBK (Báo Cô)
                                   </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                                </td>
+                                <td className="code-cell">{it.code}</td>
+                                <td className="row-vi">{it.name}</td>
+                                <td>
+                                  <b>{it.ctdtGroup}</b>{' '}
+                                  <CategoryBadge cat={it.ctdtCategory} />
+                                </td>
+                                <td>
+                                  <b>{it.khgdSemester}</b>{' '}
+                                  <CategoryBadge cat={it.khgdCategory} />{' '}
+                                  {it.khgdSubgroup && (
+                                    <span style={{ fontSize: 11, color: 'var(--text2)' }}>
+                                      ({it.khgdSubgroup})
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                       </table>
                     </div>
@@ -1583,7 +1705,7 @@ export default function App() {
                 <div className="section-card">
                   <div className="section-head">
                     <div className="section-head-left">
-                      <span>📑</span>
+                      <FolderKanban size={16} style={{ color: 'var(--accent)' }} />
                       <span className="section-head-title">
                         Tổng quan các {resMode === 'khgd' ? 'Học kỳ' : 'Nhóm kiến thức'}{' '}
                         ({currentRes.fileLabel})
@@ -1623,8 +1745,12 @@ export default function App() {
                             <td>
                               <CategoryBadge cat={g.prettyCategory} />
                             </td>
-                            <td style={{ fontFamily: 'var(--mono)' }}>{g.origCount}</td>
-                            <td style={{ fontFamily: 'var(--mono)' }}>{g.prettyCount}</td>
+                            <td style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>
+                              {g.origCount}
+                            </td>
+                            <td style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>
+                              {g.prettyCount}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1644,7 +1770,8 @@ export default function App() {
                     className={`subtab-btn ${b2SubTab === 'rows' ? 'active' : ''}`}
                     onClick={() => setB2SubTab('rows')}
                   >
-                    📋 Đối chiếu từng dòng ({currentRes.fileLabel})
+                    <ListChecks size={15} />
+                    Đối chiếu từng dòng ({currentRes.fileLabel})
                     {stats.miss + stats.wrong > 0 ? (
                       <span className="tb tb-red">{stats.miss + stats.wrong}</span>
                     ) : (
@@ -1655,7 +1782,8 @@ export default function App() {
                     className={`subtab-btn ${b2SubTab === 'missing' ? 'active' : ''}`}
                     onClick={() => setB2SubTab('missing')}
                   >
-                    🔎 Sót môn / Thừa môn ({currentRes.fileLabel})
+                    <Search size={15} />
+                    Sót môn / Thừa môn ({currentRes.fileLabel})
                     {currentRes.missingInPretty.length +
                       currentRes.extraInPretty.length >
                     0 ? (
@@ -1671,7 +1799,8 @@ export default function App() {
                     className={`subtab-btn ${b2SubTab === 'credits' ? 'active' : ''}`}
                     onClick={() => setB2SubTab('credits')}
                   >
-                    🔢 Tín chỉ ({currentRes.fileLabel})
+                    <Layers size={15} />
+                    Tín chỉ ({currentRes.fileLabel})
                     {stats.creditMismatch > 0 ? (
                       <span className="tb tb-red">{stats.creditMismatch} lệch</span>
                     ) : (
@@ -1682,7 +1811,8 @@ export default function App() {
                     className={`subtab-btn ${b2SubTab === 'spelling' ? 'active' : ''}`}
                     onClick={() => setB2SubTab('spelling')}
                   >
-                    ✍️ Chính tả (Phân biệt lỗi Bản đẹp vs lỗi từ MyBK)
+                    <SpellCheck size={15} />
+                    Chính tả (Phân biệt lỗi Bản đẹp vs lỗi từ MyBK)
                     {currentRes.spellingIssues.length > 0 ? (
                       <span
                         className={`tb ${
@@ -1704,17 +1834,17 @@ export default function App() {
                       <div className="filter-row" style={{ marginBottom: 0 }}>
                         {[
                           { key: 'all', label: 'Tất cả' },
-                          { key: 'match', label: 'Khớp', dot: '#22c55e' },
-                          { key: 'miss', label: 'Thiếu môn', dot: '#ef4444' },
-                          { key: 'wrong', label: 'Sai thông tin', dot: '#f59e0b' },
+                          { key: 'match', label: 'Khớp', dot: '#059669' },
+                          { key: 'miss', label: 'Thiếu môn', dot: '#e11d48' },
+                          { key: 'wrong', label: 'Sai thông tin', dot: '#d97706' },
                           {
                             key: 'wrong-prereq',
                             label: 'Sai ĐK tiên quyết',
-                            dot: '#ec4899',
+                            dot: '#db2777',
                           },
-                          { key: 'wrong-en', label: 'Sai tiếng Anh', dot: '#4f8ef7' },
-                          { key: 'wrong-group', label: 'Sai nhóm/HK', dot: '#f97316' },
-                          { key: 'na', label: '#N/A', dot: '#f87171' },
+                          { key: 'wrong-en', label: 'Sai tiếng Anh', dot: '#2563eb' },
+                          { key: 'wrong-group', label: 'Sai nhóm/HK', dot: '#ea580c' },
+                          { key: 'na', label: '#N/A', dot: '#f43f5e' },
                         ].map((f) => (
                           <button
                             key={f.key}
@@ -1729,7 +1859,7 @@ export default function App() {
                         ))}
                       </div>
                       <button className="export-btn" onClick={handleExportCsv}>
-                        ⬇ Xuất CSV ({currentRes.fileLabel})
+                        <ArrowDownToLine size={13} /> Xuất CSV ({currentRes.fileLabel})
                       </button>
                     </div>
 
@@ -1756,7 +1886,7 @@ export default function App() {
                                   colSpan={9}
                                   style={{
                                     textAlign: 'center',
-                                    padding: 26,
+                                    padding: 28,
                                     color: 'var(--text2)',
                                   }}
                                 >
@@ -1794,7 +1924,7 @@ export default function App() {
                                       style={{
                                         color: 'var(--accent)',
                                         fontSize: 12,
-                                        fontWeight: 600,
+                                        fontWeight: 700,
                                       }}
                                     >
                                       {row.name}
@@ -1805,7 +1935,7 @@ export default function App() {
 
                               if (row.type === 'separator') {
                                 return (
-                                  <tr key={idx} style={{ opacity: 0.65 }}>
+                                  <tr key={idx} style={{ opacity: 0.7 }}>
                                     <td
                                       style={{
                                         color: 'var(--text2)',
@@ -1840,7 +1970,7 @@ export default function App() {
                                     style={{
                                       color: 'var(--text2)',
                                       fontFamily: 'var(--mono)',
-                                      fontSize: 10,
+                                      fontSize: 10.5,
                                     }}
                                   >
                                     {row.row}
@@ -1886,7 +2016,7 @@ export default function App() {
                                           <div className="diff-hint-pink">
                                             ↳ {currentRes.fileLabel}:{' '}
                                             {row.pEntry?.prereq || 'Đang trống'}
-                                            <div style={{ fontWeight: 600, marginTop: 2 }}>
+                                            <div style={{ fontWeight: 700, marginTop: 2 }}>
                                               ⚡ {row.prereqDiff.summary}
                                             </div>
                                           </div>
@@ -1945,7 +2075,7 @@ export default function App() {
                                       <div
                                         style={{
                                           display: 'flex',
-                                          gap: 4,
+                                          gap: 5,
                                           alignItems: 'center',
                                         }}
                                       >
@@ -1993,7 +2123,7 @@ export default function App() {
                   <div className="section-card">
                     <div className="section-head">
                       <div className="section-head-left">
-                        <span>🔎</span>
+                        <Search size={16} style={{ color: 'var(--accent)' }} />
                         <span className="section-head-title">
                           Rà Sót môn / Thừa môn trên{' '}
                           <span
@@ -2008,7 +2138,7 @@ export default function App() {
                     </div>
                     {currentRes.missingInPretty.length === 0 &&
                     currentRes.extraInPretty.length === 0 ? (
-                      <div className="empty-state" style={{ padding: '28px 16px' }}>
+                      <div className="empty-state" style={{ padding: '28px 16px', border: 'none' }}>
                         <p>
                           ✅ <strong>{currentRes.fileLabel}</strong> có đầy đủ 100% mã học
                           phần khớp với sheet tương ứng trên File gốc MyBK!
@@ -2029,47 +2159,51 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody>
-                            {currentRes.missingInPretty.map((m, i) => (
-                              <tr key={`m-${i}`}>
-                                <td>
-                                  <span className="file-origin-tag fo-err">
-                                    Thiếu ở: {currentRes.fileLabel}
-                                  </span>
-                                </td>
-                                <td>
-                                  <span className="badge b-miss">✗ Bị sót môn</span>
-                                </td>
-                                <td className="code-cell">{m.code}</td>
-                                <td className="row-vi">{m.name}</td>
-                                <td className="cred-cell">{m.credits}</td>
-                                <td>{m.group}</td>
-                                <td style={{ color: '#fca5a5', fontSize: 11.5 }}>
-                                  Sẽ chèn dòng cảnh báo ĐỎ cuối bản sao{' '}
-                                  {currentRes.fileLabel}
-                                </td>
-                              </tr>
-                            ))}
-                            {currentRes.extraInPretty.map((m, i) => (
-                              <tr key={`e-${i}`}>
-                                <td>
-                                  <span className="file-origin-tag fo-err">
-                                    Thừa/Lạ ở: {currentRes.fileLabel}
-                                  </span>
-                                </td>
-                                <td>
-                                  <span className="badge b-wrong">
-                                    ! Không có ở Gốc MyBK
-                                  </span>
-                                </td>
-                                <td className="code-cell">{m.code}</td>
-                                <td className="row-vi">{m.name}</td>
-                                <td className="cred-cell">{m.credits}</td>
-                                <td>{m.group}</td>
-                                <td style={{ color: '#fcd34d', fontSize: 11.5 }}>
-                                  Sẽ tô ĐỎ ô Mã môn tại dòng #{m.excelRow} của bản sao
-                                </td>
-                              </tr>
-                            ))}
+                            {currentRes.missingInPretty
+                              .filter((m) => matchesQuery(m.code, m.name))
+                              .map((m, i) => (
+                                <tr key={`m-${i}`}>
+                                  <td>
+                                    <span className="file-origin-tag fo-err">
+                                      Thiếu ở: {currentRes.fileLabel}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <span className="badge b-miss">✗ Bị sót môn</span>
+                                  </td>
+                                  <td className="code-cell">{m.code}</td>
+                                  <td className="row-vi">{m.name}</td>
+                                  <td className="cred-cell">{m.credits}</td>
+                                  <td>{m.group}</td>
+                                  <td style={{ color: 'var(--red)', fontSize: 11.5, fontWeight: 500 }}>
+                                    Sẽ chèn dòng cảnh báo ĐỎ cuối bản sao{' '}
+                                    {currentRes.fileLabel}
+                                  </td>
+                                </tr>
+                              ))}
+                            {currentRes.extraInPretty
+                              .filter((m) => matchesQuery(m.code, m.name))
+                              .map((m, i) => (
+                                <tr key={`e-${i}`}>
+                                  <td>
+                                    <span className="file-origin-tag fo-err">
+                                      Thừa/Lạ ở: {currentRes.fileLabel}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <span className="badge b-wrong">
+                                      ! Không có ở Gốc MyBK
+                                    </span>
+                                  </td>
+                                  <td className="code-cell">{m.code}</td>
+                                  <td className="row-vi">{m.name}</td>
+                                  <td className="cred-cell">{m.credits}</td>
+                                  <td>{m.group}</td>
+                                  <td style={{ color: 'var(--yellow)', fontSize: 11.5, fontWeight: 500 }}>
+                                    Sẽ tô ĐỎ ô Mã môn tại dòng #{m.excelRow} của bản sao
+                                  </td>
+                                </tr>
+                              ))}
                           </tbody>
                         </table>
                       </div>
@@ -2089,7 +2223,7 @@ export default function App() {
                             : 'alert-warn'
                         }`}
                       >
-                        <span>🎓</span>
+                        <GraduationCap size={18} style={{ flexShrink: 0, marginTop: 2 }} />
                         <div>
                           <strong>
                             Tổng tín chỉ toàn chương trình trên {currentRes.fileLabel}:
@@ -2108,7 +2242,8 @@ export default function App() {
                     <div className="grp-table-wrap">
                       <div className="grp-header">
                         <div className="grp-header-title">
-                          🔢 Đối chiếu tín chỉ từng{' '}
+                          <Layers size={16} style={{ color: 'var(--accent)' }} />
+                          Đối chiếu tín chỉ từng{' '}
                           {resMode === 'khgd' ? 'Học kỳ' : 'Khối kiến thức'} trên{' '}
                           {currentRes.fileLabel}
                         </div>
@@ -2128,7 +2263,7 @@ export default function App() {
                           <div
                             key={idx}
                             className="grp-grid grp-row-data"
-                            style={isBad ? { background: 'rgba(239,68,68,.05)' } : {}}
+                            style={isBad ? { background: 'var(--red-soft)' } : {}}
                           >
                             <div>
                               <span
@@ -2141,11 +2276,11 @@ export default function App() {
                                 {g.gid}
                               </span>
                               <div>
-                                <div style={{ fontSize: 11.5 }}>{g.label}</div>
+                                <div style={{ fontSize: 12, fontWeight: 600 }}>{g.label}</div>
                                 {g.note && (
                                   <div
                                     style={{
-                                      fontSize: 10,
+                                      fontSize: 10.5,
                                       color: 'var(--text2)',
                                       marginTop: 2,
                                     }}
@@ -2186,7 +2321,7 @@ export default function App() {
                   <div className="section-card">
                     <div className="section-head">
                       <div className="section-head-left">
-                        <span>✍️</span>
+                        <SpellCheck size={16} style={{ color: 'var(--accent)' }} />
                         <span className="section-head-title">
                           Rà Chính tả & Định dạng trên {currentRes.fileLabel} (Tách rõ
                           nguồn lỗi)
@@ -2204,7 +2339,7 @@ export default function App() {
                               currentRes.spellingIssues.filter((x) => !x.alsoInMybk)
                                 .length
                             })`,
-                            dot: '#ef4444',
+                            dot: '#e11d48',
                           },
                           {
                             key: 'from_mybk',
@@ -2212,12 +2347,12 @@ export default function App() {
                               currentRes.spellingIssues.filter((x) => x.alsoInMybk)
                                 .length
                             })`,
-                            dot: '#f97316',
+                            dot: '#ea580c',
                           },
                           {
                             key: 'typo',
                             label: `Chỉ lỗi từ vựng (${stats.typoCount})`,
-                            dot: '#ec4899',
+                            dot: '#db2777',
                           },
                         ].map((f) => (
                           <button
@@ -2237,8 +2372,10 @@ export default function App() {
                     </div>
 
                     {filteredSpelling.length === 0 ? (
-                      <div className="empty-state">
-                        <div className="icon">✨</div>
+                      <div className="empty-state" style={{ border: 'none' }}>
+                        <div className="icon-wrap">
+                          <Sparkles size={24} />
+                        </div>
                         <p>Không có lỗi chính tả nào trong bộ lọc này.</p>
                       </div>
                     ) : (
@@ -2275,15 +2412,16 @@ export default function App() {
                                   [{sp.lang}] {sp.text}
                                 </td>
                                 <td>
-                                  <div style={{ color: '#fca5a5', fontSize: 12 }}>
+                                  <div style={{ color: 'var(--red)', fontSize: 12, fontWeight: 500 }}>
                                     {sp.detail}
                                   </div>
                                   {sp.suggestion && (
                                     <div
                                       style={{
-                                        fontSize: 11,
+                                        fontSize: 11.5,
                                         color: 'var(--green)',
-                                        marginTop: 2,
+                                        marginTop: 3,
+                                        fontWeight: 500,
                                       }}
                                     >
                                       ↳ Gợi ý: <code>{sp.suggestion}</code>
@@ -2291,7 +2429,7 @@ export default function App() {
                                   )}
                                 </td>
                                 <td>
-                                  <div style={{ display: 'flex', gap: 5 }}>
+                                  <div style={{ display: 'flex', gap: 6 }}>
                                     <button
                                       className="export-btn"
                                       onClick={() => {
@@ -2303,6 +2441,7 @@ export default function App() {
                                           sp.code,
                                           `${prev}${sp.detail}`
                                         );
+                                        toast.success(`Đã thêm Note đỏ cho môn ${sp.code}`);
                                       }}
                                     >
                                       +Note đỏ Bản đẹp
@@ -2335,7 +2474,7 @@ export default function App() {
               <div>
                 {currentRes.prereqMismatches.length > 0 && (
                   <div className="alert-banner alert-pink">
-                    <span>⚡</span>
+                    <Zap size={18} style={{ color: 'var(--pink)', flexShrink: 0, marginTop: 2 }} />
                     <div>
                       <strong>
                         Phát hiện {currentRes.prereqMismatches.length} môn bị thiếu / sai
@@ -2354,7 +2493,7 @@ export default function App() {
 
                 {currentRes.legendWarnings.map((lw, idx) => (
                   <div key={idx} className="alert-banner alert-warn">
-                    <span>📝</span>
+                    <AlertTriangle size={18} style={{ color: 'var(--yellow)', flexShrink: 0, marginTop: 2 }} />
                     <div>
                       <strong>
                         Lưu ý dòng Ghi chú (notes) trên {lw.fileLabel}:
@@ -2368,7 +2507,7 @@ export default function App() {
                 <div className="section-card">
                   <div className="section-head">
                     <div className="section-head-left">
-                      <span>🔗</span>
+                      <ShieldAlert size={16} style={{ color: 'var(--pink)' }} />
                       <span className="section-head-title">
                         1. Rà Tiên quyết / Học phần điều kiện trên{' '}
                         <span
@@ -2389,12 +2528,12 @@ export default function App() {
                         {
                           key: 'mismatch',
                           label: `Thiếu/Sai ở ${currentRes.fileLabel} (${currentRes.prereqMismatches.length})`,
-                          dot: '#ef4444',
+                          dot: '#e11d48',
                         },
                         {
                           key: 'tq-only',
                           label: 'Chỉ môn có Tiên quyết (TQ)',
-                          dot: '#ec4899',
+                          dot: '#db2777',
                         },
                       ].map((f) => (
                         <button
@@ -2414,8 +2553,10 @@ export default function App() {
                   </div>
 
                   {filteredPrereqCourses.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="icon">✅</div>
+                    <div className="empty-state" style={{ border: 'none' }}>
+                      <div className="icon-wrap">
+                        <CheckCircle2 size={24} />
+                      </div>
                       <p>
                         Tất cả học phần điều kiện / tiên quyết trên{' '}
                         <strong>{currentRes.fileLabel}</strong> đều khớp chuẩn với File
@@ -2466,10 +2607,10 @@ export default function App() {
                                     {item.prereqMismatch && (
                                       <div
                                         style={{
-                                          color: '#f87171',
+                                          color: 'var(--red)',
                                           fontSize: 11,
                                           fontWeight: 700,
-                                          marginTop: 3,
+                                          marginTop: 4,
                                         }}
                                       >
                                         ⚡ {item.prereqDiff.summary}
@@ -2480,10 +2621,11 @@ export default function App() {
                                   <span className="badge b-miss">✗ Thiếu môn</span>
                                 )}
                               </td>
-                              <td style={{ fontSize: 11 }}>
+                              <td style={{ fontSize: 11.5 }}>
                                 {(item.prereqAnalysis || []).map((pa, i) => (
-                                  <div key={i} style={{ marginBottom: 2 }}>
-                                    <code>{pa.code}</code>: {pa.scopeLabel}
+                                  <div key={i} style={{ marginBottom: 3 }}>
+                                    <code className="code-cell">{pa.code}</code>:{' '}
+                                    {pa.scopeLabel}
                                     {pa.semesterCheck && (
                                       <div
                                         style={{
@@ -2527,7 +2669,7 @@ export default function App() {
                 <div className="section-card">
                   <div className="section-head">
                     <div className="section-head-left">
-                      <span>🎓</span>
+                      <GraduationCap size={16} style={{ color: 'var(--accent)' }} />
                       <span className="section-head-title">
                         2. Yêu cầu hoàn thành chương trình, Ngoại ngữ & Điều kiện tốt
                         nghiệp (ENG_B2 - Đ/kiện ngoại ngữ tốt nghiệp SĐH) trên{' '}
@@ -2548,44 +2690,46 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {currentRes.specialRequirements.map((sr, idx) => (
-                          <tr key={idx}>
-                            <td>
-                              <b>{sr.group}</b>
-                            </td>
-                            <td className="code-cell">{sr.code}</td>
-                            <td>
-                              <div className="row-vi">{sr.name}</div>
-                              {sr.eng && <div className="row-en">{sr.eng}</div>}
-                            </td>
-                            <td className="cred-cell">{sr.credits}</td>
-                            <td style={{ fontSize: 11.5 }}>
-                              Gốc: <code>{sr.origPrereq || 'Không'}</code>
-                              {sr.prereqMismatch && (
-                                <div style={{ color: '#f87171', fontWeight: 700 }}>
-                                  {currentRes.fileLabel}:{' '}
-                                  <code>{sr.prettyPrereq || 'TRỐNG'}</code> (
-                                  {sr.prereqSummary})
-                                </div>
-                              )}
-                            </td>
-                            <td>
-                              {!sr.inPretty ? (
-                                <span className="file-origin-tag fo-err">
-                                  ✗ Bị thiếu ở {currentRes.fileLabel}
-                                </span>
-                              ) : sr.prereqMismatch ? (
-                                <span className="file-origin-tag fo-err">
-                                  ⚡ Thiếu ĐK trên {currentRes.fileLabel}
-                                </span>
-                              ) : (
-                                <span className="badge b-match">
-                                  ✓ Đầy đủ trên {currentRes.fileLabel}
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {currentRes.specialRequirements
+                          .filter((sr) => matchesQuery(sr.code, sr.name, sr.eng))
+                          .map((sr, idx) => (
+                            <tr key={idx}>
+                              <td>
+                                <b>{sr.group}</b>
+                              </td>
+                              <td className="code-cell">{sr.code}</td>
+                              <td>
+                                <div className="row-vi">{sr.name}</div>
+                                {sr.eng && <div className="row-en">{sr.eng}</div>}
+                              </td>
+                              <td className="cred-cell">{sr.credits}</td>
+                              <td style={{ fontSize: 11.5 }}>
+                                Gốc: <code>{sr.origPrereq || 'Không'}</code>
+                                {sr.prereqMismatch && (
+                                  <div style={{ color: 'var(--red)', fontWeight: 700 }}>
+                                    {currentRes.fileLabel}:{' '}
+                                    <code>{sr.prettyPrereq || 'TRỐNG'}</code> (
+                                    {sr.prereqSummary})
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                {!sr.inPretty ? (
+                                  <span className="file-origin-tag fo-err">
+                                    ✗ Bị thiếu ở {currentRes.fileLabel}
+                                  </span>
+                                ) : sr.prereqMismatch ? (
+                                  <span className="file-origin-tag fo-err">
+                                    ⚡ Thiếu ĐK trên {currentRes.fileLabel}
+                                  </span>
+                                ) : (
+                                  <span className="badge b-match">
+                                    ✓ Đầy đủ trên {currentRes.fileLabel}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -2602,7 +2746,7 @@ export default function App() {
                   <div className="section-card" style={{ marginBottom: 0 }}>
                     <div className="section-head">
                       <div className="section-head-left">
-                        <span>🖍️</span>
+                        <FileWarning size={16} style={{ color: 'var(--red)' }} />
                         <span className="section-head-title">
                           Tạo Bản Sao Tô Đỏ cho{' '}
                           <span
@@ -2618,10 +2762,10 @@ export default function App() {
                     <div className="section-body">
                       <p
                         style={{
-                          fontSize: 12,
+                          fontSize: 12.5,
                           color: 'var(--text2)',
-                          lineHeight: 1.6,
-                          marginBottom: 12,
+                          lineHeight: 1.65,
+                          marginBottom: 14,
                         }}
                       >
                         Bản sao giữ nguyên 100% bố cục trình bày của{' '}
@@ -2632,25 +2776,25 @@ export default function App() {
                         </strong>
                         . Mọi ô bị thiếu hoặc bị sai (Tên môn, Tín chỉ, Tiên quyết bị bỏ
                         trống, Mã môn sai nhóm/HK, Sót môn) sẽ được{' '}
-                        <strong style={{ color: '#f87171' }}>
+                        <strong style={{ color: 'var(--red)' }}>
                           đánh dấu màu đỏ trực tiếp ngay tại ô đó
                         </strong>{' '}
                         kèm cột Note màu đỏ bên phải bảng.
                       </p>
 
                       {/* Chọn kiểu tô đỏ */}
-                      <div style={{ marginBottom: 12 }}>
+                      <div style={{ marginBottom: 14 }}>
                         <div
                           style={{
-                            fontSize: 11.5,
+                            fontSize: 12,
                             color: 'var(--text2)',
-                            marginBottom: 6,
+                            marginBottom: 7,
                             fontWeight: 600,
                           }}
                         >
                           Kiểu đánh dấu ô bị sai / thiếu trên bản sao Excel:
                         </div>
-                        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {[
                             {
                               key: 'both',
@@ -2680,7 +2824,7 @@ export default function App() {
                           display: 'flex',
                           gap: 16,
                           flexWrap: 'wrap',
-                          marginBottom: 12,
+                          marginBottom: 14,
                           fontSize: 12,
                         }}
                       >
@@ -2719,13 +2863,14 @@ export default function App() {
                         </label>
                       </div>
 
-                      <div style={{ marginBottom: 12 }}>
+                      <div style={{ marginBottom: 14 }}>
                         <label
                           style={{
                             display: 'block',
                             fontSize: 11.5,
                             color: 'var(--text2)',
-                            marginBottom: 4,
+                            marginBottom: 5,
+                            fontWeight: 600,
                           }}
                         >
                           Tên file bản sao ({currentRes.fileLabel}):
@@ -2750,9 +2895,16 @@ export default function App() {
                             disabled={exportingKey === 'ctdt'}
                             onClick={() => handleDownloadPrettyCopyFor('ctdt')}
                           >
-                            {exportingKey === 'ctdt'
-                              ? '⏳ Đang xuất CTĐT...'
-                              : `📥 Tải Bản Sao CTĐT Đẹp Tô Đỏ (${reviewData.ctdtResult.stats.totalFileErrors} lỗi)`}
+                            {exportingKey === 'ctdt' ? (
+                              <>
+                                <Loader2 size={15} className="spin-icon" /> Đang xuất CTĐT...
+                              </>
+                            ) : (
+                              <>
+                                <Download size={15} /> Tải Bản Sao CTĐT Đẹp Tô Đỏ (
+                                {reviewData.ctdtResult.stats.totalFileErrors} lỗi)
+                              </>
+                            )}
                           </button>
                         )}
                         {reviewData.khgdResult && (
@@ -2764,9 +2916,16 @@ export default function App() {
                             disabled={exportingKey === 'khgd'}
                             onClick={() => handleDownloadPrettyCopyFor('khgd')}
                           >
-                            {exportingKey === 'khgd'
-                              ? '⏳ Đang xuất KHGD...'
-                              : `📥 Tải Bản Sao KHGD Đẹp Tô Đỏ (${reviewData.khgdResult.stats.totalFileErrors} lỗi)`}
+                            {exportingKey === 'khgd' ? (
+                              <>
+                                <Loader2 size={15} className="spin-icon" /> Đang xuất KHGD...
+                              </>
+                            ) : (
+                              <>
+                                <Download size={15} /> Tải Bản Sao KHGD Đẹp Tô Đỏ (
+                                {reviewData.khgdResult.stats.totalFileErrors} lỗi)
+                              </>
+                            )}
                           </button>
                         )}
                       </div>
@@ -2776,7 +2935,7 @@ export default function App() {
                   <div className="section-card" style={{ marginBottom: 0 }}>
                     <div className="section-head">
                       <div className="section-head-left">
-                        <span>📝</span>
+                        <FileText size={16} style={{ color: 'var(--accent)' }} />
                         <span className="section-head-title">
                           Ghi chú chung đính kèm đầu bản sao ({currentRes.fileLabel})
                         </span>
@@ -2785,7 +2944,7 @@ export default function App() {
                     <div className="section-body">
                       <textarea
                         className="note-input"
-                        rows={5}
+                        rows={6}
                         style={{ resize: 'vertical' }}
                         placeholder={`Ghi chú riêng cho ${currentRes.fileLabel} (sẽ in chữ đỏ ở góc trên bản sao Excel)...`}
                         value={generalNoteByFile[currentScopeKey] || ''}
@@ -2798,8 +2957,8 @@ export default function App() {
                       />
                       <div
                         style={{
-                          marginTop: 8,
-                          fontSize: 11.5,
+                          marginTop: 10,
+                          fontSize: 12,
                           color: 'var(--text2)',
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -2820,7 +2979,7 @@ export default function App() {
                 <div className="section-card">
                   <div className="section-head">
                     <div className="section-head-left">
-                      <span>📋</span>
+                      <ListChecks size={16} style={{ color: 'var(--accent)' }} />
                       <span className="section-head-title">
                         Danh sách dòng trên {currentRes.fileLabel} — Các dòng có lỗi sẽ tự
                         động tô ĐỎ ô sai/thiếu
@@ -2839,7 +2998,7 @@ export default function App() {
                               (x) => x.severity !== 'ok'
                             ).length
                           })`,
-                          dot: '#ef4444',
+                          dot: '#e11d48',
                         },
                         {
                           key: 'noted',
@@ -2850,7 +3009,7 @@ export default function App() {
                                 currentChecked[x.code]
                             ).length
                           })`,
-                          dot: '#22c55e',
+                          dot: '#059669',
                         },
                       ].map((f) => (
                         <button
@@ -2943,12 +3102,13 @@ export default function App() {
                                 ) : (
                                   <div
                                     style={{
-                                      fontSize: 11,
+                                      fontSize: 11.5,
                                       color:
                                         item.severity === 'error'
-                                          ? '#fca5a5'
-                                          : '#fcd34d',
-                                      lineHeight: 1.45,
+                                          ? 'var(--red)'
+                                          : 'var(--yellow)',
+                                      lineHeight: 1.5,
+                                      fontWeight: 500,
                                     }}
                                   >
                                     {item.autoNotes.map((n, i) => (
@@ -2993,9 +3153,9 @@ export default function App() {
                 }
                 style={{ opacity: currentStepIdx <= 0 ? 0.35 : 1 }}
               >
-                ← Bước trước
+                <ChevronLeft size={15} /> Bước trước
               </button>
-              <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+              <span style={{ fontSize: 12.5, color: 'var(--text2)' }}>
                 Đang xem <strong>{currentRes.fileLabel}</strong> •{' '}
                 <strong>
                   Bước {currentStepIdx + 1}/4 ({STEP_META[activeStep].code})
@@ -3012,10 +3172,10 @@ export default function App() {
                   opacity: currentStepIdx >= stepOrder.length - 1 ? 0.35 : 1,
                 }}
               >
-                Bước tiếp theo →
+                Bước tiếp theo <ChevronRight size={15} />
               </button>
             </div>
-          </>
+          </motion.div>
         )}
 
         {/* =====================================================================
@@ -3027,26 +3187,45 @@ export default function App() {
               <div>
                 <div
                   style={{
-                    fontSize: 10.5,
+                    fontSize: 11,
                     fontFamily: 'var(--mono)',
-                    color: '#fdba74',
+                    color: 'var(--orange)',
                     textTransform: 'uppercase',
                     letterSpacing: 1,
                     fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
                   }}
                 >
-                  🏛️ Tách riêng bất cập từ File 1 — Hệ thống MyBK ({fileMybk?.name})
+                  <Building2 size={14} /> Tách riêng bất cập từ File 1 — Hệ thống MyBK (
+                  {fileMybk?.name})
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>
-                  📨 Khung Tổng Hợp Note File MyBK Để Báo Riêng Với Cô
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 800,
+                    marginTop: 3,
+                    color: 'var(--text)',
+                  }}
+                >
+                  Khung Tổng Hợp Note File MyBK Để Báo Riêng Với Cô
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="fh-btn btn-orange" onClick={handleCopyProfNote}>
-                  {copiedProf ? '✓ Đã Copy vào Clipboard!' : '📋 Copy nội dung báo Cô'}
+                  {copiedProf ? (
+                    <>
+                      <Check size={14} /> Đã Copy vào Clipboard!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} /> Copy nội dung báo Cô
+                    </>
+                  )}
                 </button>
                 <button className="fh-btn" onClick={handleDownloadProfTxt}>
-                  ⬇ Tải file .txt
+                  <Download size={14} /> Tải file .txt
                 </button>
               </div>
             </div>
@@ -3056,21 +3235,21 @@ export default function App() {
               <div>
                 <div
                   style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    marginBottom: 8,
-                    color: '#fed7aa',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    marginBottom: 10,
+                    color: 'var(--text)',
                   }}
                 >
                   Tick chọn các điểm trên File gốc MyBK muốn đưa vào tin nhắn báo Cô:
                 </div>
 
-                <div style={{ maxHeight: 260, overflowY: 'auto', paddingRight: 4 }}>
+                <div style={{ maxHeight: 270, overflowY: 'auto', paddingRight: 4 }}>
                   {[...reviewData.mybkAudit.reportItems, ...mybkCustomItems].length ===
                     0 && (
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: 12.5,
                         color: 'var(--text2)',
                         padding: '14px 0',
                       }}
@@ -3097,7 +3276,7 @@ export default function App() {
                             }));
                             setProfDraftEdited(null);
                           }}
-                          style={{ marginTop: 3 }}
+                          style={{ marginTop: 3, width: 15, height: 15 }}
                         />
                         <div>
                           <span
@@ -3114,7 +3293,7 @@ export default function App() {
                 </div>
 
                 {/* Ô thêm ghi chú MyBK thủ công */}
-                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <input
                     className="note-input"
                     placeholder="Thêm ghi chú khác về file MyBK để báo Cô..."
@@ -3136,7 +3315,7 @@ export default function App() {
                       }
                     }}
                   >
-                    + Thêm ý
+                    <Plus size={14} /> Thêm ý
                   </button>
                 </div>
               </div>
@@ -3148,11 +3327,11 @@ export default function App() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: 8,
+                    marginBottom: 10,
                   }}
                 >
                   <span
-                    style={{ fontSize: 12, fontWeight: 600, color: '#fed7aa' }}
+                    style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}
                   >
                     Nội dung tin nhắn / ghi chú gửi Cô (có thể sửa trực tiếp):
                   </span>
@@ -3161,7 +3340,7 @@ export default function App() {
                       className="reset-order-btn"
                       onClick={() => setProfDraftEdited(null)}
                     >
-                      ↺ Tạo lại tự động
+                      <RotateCcw size={12} /> Tạo lại tự động
                     </button>
                   )}
                 </div>
@@ -3177,7 +3356,9 @@ export default function App() {
 
         {!reviewData && !loading && (
           <div className="empty-state">
-            <div className="icon">📊</div>
+            <div className="icon-wrap">
+              <BookOpenCheck size={28} />
+            </div>
             <p>
               Tải lên <strong>File 1 (Gốc MyBK)</strong> cùng với{' '}
               <strong>File 2 (Bản đẹp CTĐT)</strong> và/hoặc{' '}
